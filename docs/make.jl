@@ -17,5 +17,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/hexaeder/IOSystems.jl",
+    repo="github.com/hexaeder/IOSystems_prototype",
+    devbranch="main"
 )
