@@ -1,0 +1,13 @@
+name = "IOSystems"
+uuid = "4663d367-db1f-4bef-81e7-dc1bd7f7b428"
+authors = ["Hans Würfel <git@wuerfel.io> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.5"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
