@@ -6,4 +6,4 @@ meant to be used.
 <!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://hexaeder.github.io/IOSystems_prototype/stable) -->
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://hexaeder.github.io/IOSystems_prototype/dev)
 [![Tests](https://github.com/hexaeder/IOSystems_prototype/workflows/Tests/badge.svg)](https://github.com/hexaeder/IOSystems_prototype/actions)
-[![Coverage](https://codecov.io/gh/hexaeder/IOSystems_prototype/branch/master/graph/badge.svg)](https://codecov.io/gh/hexaeder/IOSystems_prototype)
+[![codecov](https://codecov.io/gh/hexaeder/IOSystems_prototype/branch/main/graph/badge.svg?token=J8NIacySeH)](https://codecov.io/gh/hexaeder/IOSystems_prototype)
