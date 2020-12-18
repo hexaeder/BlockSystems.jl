@@ -1,7 +1,6 @@
 using IOSystems
 using Documenter
 using Literate
-using Plots # to not capture precompilation output
 
 # generate examples
 EXAMPLE = joinpath(@__DIR__, "..", "examples", "spacecraft.jl")
