@@ -1,5 +1,14 @@
 using IOSystems
 using Documenter
+using Literate
+using Plots # to not capture precompilation output
+
+# generate examples
+EXAMPLE = joinpath(@__DIR__, "..", "examples", "spacecraft.jl")
+OUTPUT = joinpath(@__DIR__, "src/generated")
+
+Literate.markdown(EXAMPLE, OUTPUT)
+Literate.script(EXAMPLE, OUTPUT)
 
 makedocs(;
     modules=[IOSystems],
@@ -13,6 +22,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Example" => "generated/spacecraft.md"
     ],
 )
 

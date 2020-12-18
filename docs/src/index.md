@@ -3,10 +3,14 @@ CurrentModule = IOSystems
 ```
 
 # IOSystems
-
-```@index
+## Types
+The base type for the IOSystems is `AbstractIOSystem`
+```@docs
+AbstractIOSystem
 ```
+whith the possible concrete implementations
 
-```@autodocs
-Modules = [IOSystems]
+```@docs
+IOBlock
+IOSystem
 ```

@@ -1,3 +1,4 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 IOSystems = "4663d367-db1f-4bef-81e7-dc1bd7f7b428"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
