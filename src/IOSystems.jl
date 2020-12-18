@@ -36,6 +36,10 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     throw(error("Variable $name does not exist"))
 end
 
+namespace_inputs(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.inputs]
+namespace_istates(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.istates]
+namespace_outputs(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.outputs]
+
 """
 $(TYPEDEF)
 

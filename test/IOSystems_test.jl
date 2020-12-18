@@ -1,7 +1,19 @@
 @info "Testes of IOSystems.jl"
 
 @testset "IOSystems.jl" begin
+    @testset "namespaced accessors" begin
+        @parameters t
+        @variables x1(t) x2(t) i1(t) i2(t) o1(t) o2(t)
+        @derivatives D'~t
+        eqs  = [D(x1) ~ i1, o1~i1, D(x2) ~ i2, o2~i2]
+        iob = IOBlock(eqs, [i1, i2], [o1, o2], name=:ns)
+        @test Set(IOSystems.namespace_inputs(iob)) == Set([iob.i1, iob.i2])
+        @test Set(IOSystems.namespace_outputs(iob)) == Set([iob.o1, iob.o2])
+        @test Set(IOSystems.namespace_istates(iob)) == Set([iob.x1, iob.x2])
+    end
+
     @testset "collect and resolve namespace" begin
+        import IOSystems.collect_and_resolve_namespace
         @parameters t
         @variables x(t) i(t) o(t)
         @derivatives D'~t
