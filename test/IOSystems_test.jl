@@ -12,40 +12,36 @@
         @test Set(IOSystems.namespace_istates(iob)) == Set([iob.x1, iob.x2])
     end
 
-    # @testset "collect and resolve namespace" begin
-    #     import IOSystems.collect_and_resolve_namespace
-    #     @parameters t
-    #     @variables x(t) i(t) o(t)
-    #     @derivatives D'~t
-    #     eqs  = [D(x) ~ i, o~i]
+    @testset "test creation of namespace map" begin
+        import IOSystems.create_namespace_map
+        @parameters t
+        @variables x(t) i(t) o(t)
+        @derivatives D'~t
+        eqs  = [D(x) ~ i, o~i]
 
-    #     @variables x2(t) i2(t) o(t)
-    #     eqs2  = [D(x) ~ i2, o~i2]
+        @variables x2(t) i2(t) o(t)
+        eqs2  = [D(x) ~ i2, D(x2) ~ i2, o~i2]
 
-    #     iob1 = IOBlock(eqs, [i], [o], name=:iob1)
-    #     iob2 = IOBlock(eqs2, [i2], [o], name=:iob2)
+        iob1 = IOBlock(eqs, [i], [o], name=:iob1)
+        iob2 = IOBlock(eqs2, [i2], [o], name=:iob2)
 
-    #     IOSystems.namespace_inputs(iob1)
+        @test Set(iob1.inputs) == Set(i)
+        @test Set(iob2.inputs) == Set(i2)
+        @test Set(iob1.outputs) == Set(o)
+        @test Set(iob2.outputs) == Set(o)
+        @test Set(iob1.istates) == Set(x)
+        @test Set(iob2.istates) == Set([x, x2])
 
-    #     @test Set(iob1.inputs) == Set(i)
-    #     @test Set(iob2.inputs) == Set(i2)
-    #     @test Set(iob1.outputs) == Set(o)
-    #     @test Set(iob2.outputs) == Set(o)
+        in  = create_namespace_map([iob1, iob2], :inputs)
+        in_ex = [iob1.i => i, iob2.i2 => i2]
+        @test Set(in) == Set(in_ex)
 
-    #     in = collect_and_resolve_namespace([iob1, iob2], :inputs)
-    #     out = collect_and_resolve_namespace([iob1, iob2], :outputs)
-    #     var = collect_and_resolve_namespace([iob1, iob2], :interns)
-    #     @test Set(keys(in)) == Set([i, i2])
-    #     @test Set(keys(out)) == Set([iob1.o, iob2.o])
-    #     @test Set(keys(var)) == Set([iob1.x, iob2.x])
+        out = create_namespace_map([iob1, iob2], :outputs)
+        out_ex = [iob1.o => iob1.o, iob2.o => iob2.o]
+        @test Set(out) == Set(out_ex)
 
-    #     ios = IOSystem([iob1.o => iob1.i], [iob1, iob2], name=:ios)
-    #     ios.name
-    #     ios.inputs
-    #     ios.interns
-    #     ios.outputs
-
-    #     ios.iob1₊x
-    # end
+        var = create_namespace_map([iob1, iob2], :istates)
+        var_ex = [iob1.x => iob1.x, iob2.x => iob2.x, iob2.x2 => x2]
+        @test Set(var) == Set(var_ex)
+    end
 end
-

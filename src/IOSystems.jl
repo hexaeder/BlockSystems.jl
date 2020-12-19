@@ -36,9 +36,12 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     throw(error("Variable $name does not exist"))
 end
 
-namespace_inputs(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.inputs]
-namespace_istates(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.istates]
-namespace_outputs(ios::AbstractIOSystem) = [renamespace(ios.name,x) for x in ios.outputs]
+function namespace_property(ios::AbstractIOSystem, prop::Symbol)
+    [renamespace(ios.name,x) for x in getproperty(ios, prop)]
+end
+namespace_inputs(ios::AbstractIOSystem)  = namespace_property(ios, :inputs)
+namespace_istates(ios::AbstractIOSystem) = namespace_property(ios, :istates)
+namespace_outputs(ios::AbstractIOSystem) = namespace_property(ios, :outputs)
 
 """
 $(TYPEDEF)
@@ -125,39 +128,31 @@ function IOSystem(
     )
 end
 
-function collect_and_resolve_namespace(io_systems, property; skip = [])
+function create_namespace_map(io_systems, property; skip = [])
     all = vcat((getproperty(ios, property) for ios in io_systems)...)
-    all_spaced = vcat((
-        map(x -> renamespace(ios.name, x), getproperty(ios, property)) for
-        ios in io_systems
-    )...)
+    all_spaced = vcat((namespace_property(ios, property) for ios in io_systems)...)
 
+    # namespaced => non-namespaced pairs
+    pairs = [Pair(t...) for t in zip(all_spaced, all)]
+    # filter out values which should be skipped (i.e. connected inputs)
+    filter!(x -> first(x) ∉ skip, pairs)
+    @show pairs
 
-    l = length(all)
-    filter!(x->x ∉ Set(skip), all)
-    if skip != []
-        @info skip all
-    end
-    if l - length(all) ≠ 0
-        @info "gefiltert!"
-    end
-
+    # find duplicates and add namepsaces
     duplicates = Set()
-    for i = 1:length(all)
-        if all[i] ∈ Set(all[i+1:end])
-            push!(duplicates, all[i])
+    for i in 1:length(pairs)
+        if last(pairs[i]) ∈ Set(last.(pairs[i+1:end]))
+            push!(duplicates, last(pairs[i]))
         end
     end
-    map_resolved = Dict()
-    for ios in io_systems
-        vec = getproperty(ios, property)
-        resolved = map(x -> x ∉ duplicates ? x : renamespace(ios.name, x), vec)
-        namespaced = map(x -> renamespace(ios.name, x), vec)
-        for kv in zip(resolved, namespaced)
-            push!(map_resolved, Pair(kv...))
+
+    for i in 1:length(pairs)
+        if pairs[i].second ∈ duplicates
+            pairs[i] = pairs[i].first => pairs[i].first
         end
     end
-    map_resolved
+
+    return pairs
 end
 
 end
