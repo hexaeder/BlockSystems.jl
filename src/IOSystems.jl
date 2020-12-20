@@ -2,8 +2,8 @@ module IOSystems
 
 using DocStringExtensions
 using ModelingToolkit
-# import internal stuff from ModelingToolkit
-import ModelingToolkit.rename, ModelingToolkit.getname, ModelingToolkit.renamespace
+using ModelingToolkit: rename, getname, renamespace
+using SymbolicUtils: Symbolic
 
 export AbstractIOSystem, IOBlock, IOSystem
 
@@ -27,7 +27,7 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     if name ∈ fieldnames(typeof(sys))
         return getfield(sys, name)
     end
-    syms = vcat(sys.inputs, sys.outputs, sys.istates)
+    syms = vcat(sys.inputs, sys.iparams, sys.istates, sys.outputs)
 
     i = findfirst(x -> getname(x) == name, syms)
     if i !== nothing
@@ -37,9 +37,11 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
 end
 
 function namespace_property(ios::AbstractIOSystem, prop::Symbol)
-    [renamespace(ios.name,x) for x in getproperty(ios, prop)]
+    [rename(sym, renamespace(ios.name, getname(sym)))
+     for sym in getproperty(ios, prop)]
 end
 namespace_inputs(ios::AbstractIOSystem)  = namespace_property(ios, :inputs)
+namespace_iparams(ios::AbstractIOSystem) = namespace_property(ios, :iparams)
 namespace_istates(ios::AbstractIOSystem) = namespace_property(ios, :istates)
 namespace_outputs(ios::AbstractIOSystem) = namespace_property(ios, :outputs)
 
@@ -51,9 +53,10 @@ $(TYPEDFIELDS)
 """
 struct IOBlock <: AbstractIOSystem
     name::Symbol
-    inputs::Vector{Term}
-    istates::Vector{Term}
-    outputs::Vector{Term}
+    inputs::Vector{Symbolic}
+    iparams::Vector{Symbolic}
+    istates::Vector{Symbolic}
+    outputs::Vector{Symbolic}
     system::ODESystem
 end
 
@@ -61,14 +64,18 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym
     os = ODESystem(eqs, name = name)
 
     # put asserts here
+    @assert Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters"
+    @assert Set(outputs) ⊆ Set(states(os)) "outputs musst be variables"
 
-    inputs = os.states ∩ inputs # gets the inputs as `tern` type
+    inputs = parameters(os) ∩ inputs # gets the inputs as `tern` type
     outputs = os.states ∩ outputs # gets the outputs as `tern` type
-    istates = setdiff(os.states, inputs ∪ outputs)
+    istates = setdiff(os.states, outputs)
+    iparams = setdiff(parameters(os), inputs)
 
-    @assert Set(os.states) == Set(inputs ∪ outputs ∪ istates)
+    @assert Set(os.states) == Set(outputs ∪ istates)
+    @assert Set(parameters(os)) == Set(inputs ∪ iparams)
 
-    IOBlock(name, inputs, istates, outputs, os)
+    IOBlock(name, inputs, iparams, istates, outputs, os)
 end
 
 """
@@ -83,13 +90,15 @@ $(TYPEDFIELDS)
 """
 struct IOSystem <: AbstractIOSystem
     name::Symbol
-    inputs::Vector{Term}
-    istates::Vector{Term}
-    outputs::Vector{Term}
-    connections::Dict{Term, Term}
-    inputs_map::Dict{Term, Term}
-    istates_map::Dict{Term, Term}
-    outputs_map::Dict{Term, Term}
+    inputs::Vector{Symbolic}
+    iparams::Vector{Symbolic}
+    istates::Vector{Symbolic}
+    outputs::Vector{Symbolic}
+    connections::Dict{Symbolic, Symbolic}
+    inputs_map::Dict{Symbolic, Symbolic}
+    iparams_map::Dict{Symbolic, Symbolic}
+    istates_map::Dict{Symbolic, Symbolic}
+    outputs_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
 
