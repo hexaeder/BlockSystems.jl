@@ -2,10 +2,11 @@ module IOSystems
 
 using DocStringExtensions
 using ModelingToolkit
-using ModelingToolkit: rename, getname, renamespace
+using ModelingToolkit: rename, getname, renamespace, namespace_equations
+using ModelingToolkit: Parameter
 using SymbolicUtils: Symbolic
 
-export AbstractIOSystem, IOBlock, IOSystem
+export AbstractIOSystem, IOBlock, IOSystem, connect_system
 
 @doc raw"""
     AbstractIOSystem
@@ -258,6 +259,58 @@ function create_namespace_map(io_systems, property; skip = [])
 
     return Dict(pairs)
 end
+
+function connect_system(ios::IOSystem)
+    # recursive connect all subsystems
+    for (i, subsys) in enumerate(ios.systems)
+        if subsys isa IOSystem
+            ios.systems[i] = connect_system(subsys)
+        end
+    end
+    eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
+
+    # get rid of closed inputs by substituting output states
+    connections = fixtermtype(ios.connections)
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
+    end
+
+    # TODO: simplifying magic
+    # - get rid of unused states
+    # - get rid of algebraic states
+
+    # apply the namespace transformations
+    in_map = fixtermtype(ios.inputs_map)
+    ip_map = fixtermtype(ios.iparams_map)
+    is_map = fixtermtype(ios.istates_map)
+    o_map  = fixtermtype(ios.outputs_map)
+    namespace_promotion = merge(in_map, ip_map, is_map, o_map)
+
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eqsubstitute(eq, namespace_promotion)
+    end
+
+    eqs
+end
+
+eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
+
+"""
+The substitution only works if the Terms have the same eltype.
+"""
+fixtermtype(sym::Sym) = sym
+fixtermtype(term::Term{Real}) = term
+fixtermtype(term::Term{Parameter{Real}}) = Term{Real}(term.op, term.args)
+fixtermtype(pair::Pair{Symbolic, Symbolic}) = fixtermtype(pair.first)=>fixtermtype(pair.second)
+function fixtermtype(dict::Dict{Symbolic, Symbolic})
+    new = Dict{Symbolic, Symbolic}()
+    for pair in dict
+        push!(new, fixtermtype(pair))
+    end
+    new
+end
+
+# TODO: during namespace_equations the Term{Parameter{Real}} -> Term{Real} while the Sym{Parameter{Real}} stay at it is => PR in ModelingToolkit
 
 
 end

@@ -205,4 +205,39 @@
         @test Set(sys.istates) == Set([y1, y2, x1, x2])
         @test Set(sys.outputs) == Set([out])
     end
+
+    @testset "test of connect_system" begin
+        #=
+                    *------------*
+        in1 --> i1 -|    iob1    |
+        in2 --> i2 -|(x1, x2)(a) |-o--*     *-----*
+                    *------------*    *-ina-| add |- add ---> out
+                    *------------*    *-inb-|     |
+        in3 --> i1 -|    iob2    |-o--*     *-----*
+        in4 --> i2 -|(x1, x2)(b) |
+                    *------------*
+        =#
+        # same system as in testset before
+        @parameters t i1(t) i2(t) a b ina(t) inb(t)
+        @variables x1(t) x2(t) o(t) add(t)
+        @derivatives D'~t
+        eqs1  = [D(x1)~a*i1, D(x2)~i2, o~x1+x2]
+        iob1 = IOBlock(eqs1, [i1, i2], [o], name=:A)
+        eqs2  = [D(x1)~b*i1, D(x2)~i2, o~x1+x2]
+        iob2 = IOBlock(eqs2, [i1, i2], [o], name=:B)
+        ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
+        @parameters in1(t) in2(t) in3(t) in4(t)
+        @variables out
+        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+                       [iob1, iob2, ioadd],
+                       inputs_map = Dict(iob1.i1 => in1,
+                                         iob1.i2 => in2,
+                                         iob2.i1 => in3,
+                                         iob2.i2 => in4),
+                       outputs_map = Dict(ioadd.add => out),
+                       name=:sys)
+        @show sys.inputs sys.iparams sys.istates sys.outputs
+
+        eqs = connect_system(sys)
+    end
 end
