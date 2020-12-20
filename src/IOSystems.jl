@@ -145,7 +145,6 @@ function create_namespace_map(io_systems, property; skip = [])
     pairs = [Pair(t...) for t in zip(all_spaced, all)]
     # filter out values which should be skipped (i.e. connected inputs)
     filter!(x -> first(x) ∉ skip, pairs)
-    @show pairs
 
     # find duplicates and add namepsaces
     duplicates = Set()
@@ -154,14 +153,15 @@ function create_namespace_map(io_systems, property; skip = [])
             push!(duplicates, last(pairs[i]))
         end
     end
-
+    # no namespace promotion for duplicates
     for i in 1:length(pairs)
         if pairs[i].second ∈ duplicates
             pairs[i] = pairs[i].first => pairs[i].first
+            @warn "Could not promote $(pairs[i].first) to system namespace."
         end
     end
 
-    return pairs
+    return Dict(pairs)
 end
 
 end
