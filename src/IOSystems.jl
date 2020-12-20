@@ -104,15 +104,14 @@ struct IOSystem <: AbstractIOSystem
     systems::Vector{AbstractIOSystem}
 end
 
-function IOSystem(
-    cons,
-    io_systems::Vector{<:AbstractIOSystem};
-    inputs_map = nothing,
-    iparams_map = nothing,
-    istates_map = nothing,
-    outputs_map = nothing,
-    name = gensym(:IOSystem),
-)
+function IOSystem(cons,
+                  io_systems::Vector{<:AbstractIOSystem};
+                  inputs_map = nothing,
+                  iparams_map = nothing,
+                  istates_map = nothing,
+                  outputs_map = nothing,
+                  name = gensym(:IOSystem),
+                  )
     namespaces = [sys.name for sys in io_systems]
     @assert namespaces == unique(namespaces) "Namespace collision in subsystems!"
 
@@ -203,6 +202,12 @@ function IOSystem(
       )
 end
 
+"""
+    fix_map_types(map)
+
+Creates Dict from map. Changes `Num`-types to `Symbolic`-types in the
+user provided maps. Map can be Dict or  Array of Pairs
+"""
 function fix_map_types(map)
     dict = Dict(map)
     newdict = Dict{Symbolic, Symbolic}()
@@ -216,6 +221,17 @@ function fix_map_types(map)
     newdict
 end
 
+"""
+    create_namespace_map(io_systems, property; skip =[])
+
+Creates dictionary from namespaced=>promoted symbols of property.
+
+property ∈ {:inputs, :iparams, :istates, :outputs}
+
+Tries to get rid of the namespace wherever possible. Namespaced symbols
+which should not be included in the resulting map can be specified using
+skip parameter.
+"""
 function create_namespace_map(io_systems, property; skip = [])
     all = vcat((getproperty(ios, property) for ios in io_systems)...)
     all_spaced = vcat((namespace_property(ios, property) for ios in io_systems)...)
