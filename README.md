@@ -1,7 +1,7 @@
 # Prototype for IOSystems.jl
 This package is a prototype to explore the possibilitys to express
-Input-Output-Systems with the help of ModelingToolkit.jl. Right know, it is not
-meant to be used.
+Input-Output-Systems with the help of ModelingToolkit.jl. Right now, it is not
+meant to be used by others.
 
 <!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://hexaeder.github.io/IOSystems_prototype/stable) -->
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://hexaeder.github.io/IOSystems_prototype/dev)
