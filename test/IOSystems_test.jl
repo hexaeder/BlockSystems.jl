@@ -1,3 +1,8 @@
+using Test
+using IOSystems
+using ModelingToolkit
+using LightGraphs
+
 @info "Testes of IOSystems.jl"
 
 @testset "IOSystems.jl" begin
@@ -239,5 +244,102 @@
         @show sys.inputs sys.iparams sys.istates sys.outputs
 
         eqs = connect_system(sys)
+        ode = ODESystem(eqs)
+        states(ode)
+        parameters(ode)
+
+        equation_dependencies(ode)
+        variable_dependencies(ode)
+        asgraph(ode)
+
+        graph = eqeq_dependencies(asgraph(ode), variable_dependencies(ode))
+        edges(graph) |> collect
+
+        @parameters t i(t)
+        @variables x(t) y(t) z(t)
+        eqs = [D(x) ~ i,
+               D(y) ~ z,
+               D(z) ~ z]
+        ode = ODESystem(eqs)
+        graph = eqeq_dependencies(asgraph(ode), variable_dependencies(ode))
+        edges(graph) |> collect
+
+        has_self_loops(graph)
+        is_connected(graph)
+        connected_components(graph)
+
+        # get partions whit no leaving edges
+        # this means, this subset of equations is NOT used by the others
+        attracting_components(graph)
+
+        # test simplecycles
+        g = SimpleDiGraph(5)
+        add_edge!(g, 3=>1)
+        add_edge!(g, 3=>2)
+        add_edge!(g, 1=>1)
+        add_edge!(g, 1=>2)
+        add_edge!(g, 2=>2)
+        add_edge!(g, 4=>3)
+        add_edge!(g, 5=>3)
+        add_edge!(g, 4=>1)
+        cycles = simplecycles(g)
+
+    end
+
+    @testset "isalgebraic" begin
+        using IOSystems: isalgebraic
+        @parameters t
+        @variables x(t) y
+        @derivatives D'~t
+        @test !isalgebraic(D(x) ~ 0)
+        @test !isalgebraic(D(y) ~ 0)
+        @test isalgebraic(x ~ 0)
+        @test isalgebraic(y ~ 0)
+    end
+
+    @testset "pairwise cycle free" begin
+        using IOSystems: pairwise_cycle_free
+        g = SimpleDiGraph(5)
+        add_edge!(g, 1=>2)
+        add_edge!(g, 2=>4)
+        add_edge!(g, 4=>5)
+        add_edge!(g, 3=>5)
+        add_edge!(g, 3=>1)
+        add_edge!(g, 2=>3)
+        add_edge!(g, 5=>4)
+        cycles = simplecycles(g)
+
+        @test pairwise_cycle_free([1,2,3,4,5], cycles) == [3,5]
+    end
+
+    @testset "reduce algebraic states" begin
+        using IOSystems: reduce_algebraic_states
+        @parameters t a b i(t)
+        @variables x(t) y(t) o(t) o1(t) o2(t)
+        @derivatives D'~t
+        # variable o can be reduced
+        eqs = [D(x) ~ x + o,
+               D(y) ~ y + o,
+               o ~ a^b]
+        reqs = reduce_algebraic_states(eqs)
+        @test reqs == [D(x) ~ x + a^b,
+                       D(y) ~ y + a^b]
+
+        eqs = [D(x) ~ i + o,
+               o ~ x + i]
+        reqs = reduce_algebraic_states(eqs)
+        @test reqs == [D(x) ~ i + (x + i)]
+
+        eqs = [D(x) ~ i,
+               o1 ~ x + o2,
+               D(y) ~ i,
+               o2 ~ y + o1]
+        reqs = reduce_algebraic_states(eqs)
+        @test reqs == [D(x) ~ i,
+                       o1 ~ x + (y + o1),
+                       D(y) ~ i]
+
+        # TODO: throws error! cant reduce cyclic algebraic state
+        # reduce_algebraic_states(reqs)
     end
 end

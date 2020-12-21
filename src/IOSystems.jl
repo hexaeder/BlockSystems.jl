@@ -2,9 +2,11 @@ module IOSystems
 
 using DocStringExtensions
 using ModelingToolkit
+using ModelingToolkit: Parameter, ODESystem, Differential
 using ModelingToolkit: rename, getname, renamespace, namespace_equations
-using ModelingToolkit: Parameter
+using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using SymbolicUtils: Symbolic
+using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem, connect_system
 
@@ -270,28 +272,72 @@ function connect_system(ios::IOSystem)
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
 
     # get rid of closed inputs by substituting output states
-    connections = fixtermtype(ios.connections)
+    # connections = fixtermtype(ios.connections)
+    connections = ios.connections
     for (i, eq) in enumerate(eqs)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
+
+    # TODO: poove assumtions
+    # - each state is represented by one lhs
+    # - lhs only first order or algebraic
+    # - no self loop in algeraic
 
     # TODO: simplifying magic
     # - get rid of unused states
     # - get rid of algebraic states
 
-    # apply the namespace transformations
-    in_map = fixtermtype(ios.inputs_map)
-    ip_map = fixtermtype(ios.iparams_map)
-    is_map = fixtermtype(ios.istates_map)
-    o_map  = fixtermtype(ios.outputs_map)
-    namespace_promotion = merge(in_map, ip_map, is_map, o_map)
+    # # apply the namespace transformations
+    # in_map = fixtermtype(ios.inputs_map)
+    # ip_map = fixtermtype(ios.iparams_map)
+    # is_map = fixtermtype(ios.istates_map)
+    # o_map  = fixtermtype(ios.outputs_map)
+    # namespace_promotion = merge(in_map, ip_map, is_map, o_map)
 
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = eqsubstitute(eq, namespace_promotion)
-    end
+    # for (i, eq) in enumerate(eqs)
+    #     eqs[i] = eqsubstitute(eq, namespace_promotion)
+    # end
 
     eqs
 end
+
+function reduce_algebraic_states(eqs::Vector{Equation})
+    eqs = deepcopy(eqs)
+    algebraic_idx = findall(isalgebraic, eqs)
+
+    # generate dependency graph
+    sys = ODESystem(eqs)
+    graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
+
+    # an algebraic eq can be substituted if it is noch part of any cycle
+    cycles = simplecycles(graph)
+    reducable = pairwise_cycle_free(algebraic_idx, cycles)
+    rules = [eq.lhs => eq.rhs for eq in eqs[reducable]]
+    # subsitute all the equations, remove substituted
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+    end
+    deleteat!(eqs, reducable)
+    return eqs
+end
+
+function pairwise_cycle_free(idx, cycles)
+    pairs = collect(Iterators.product(idx, idx))
+    # check for each pair whether found in cycle
+    incycle(p) = p[1]==p[2] ? false : any(map(c -> p ⊆ c, cycles))
+    A = incycle.(pairs)
+    if !any(A)
+        return idx
+    else
+        # find the variable with the highes number of loops
+        cycle_count = reduce(+, A, dims=1)[:]
+        worst_idx = findmax(cycle_count)[2]
+        deleteat!(idx, worst_idx)
+        return pairwise_cycle_free(idx, cycles)
+    end
+end
+
+isalgebraic(eq::Equation) = eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
