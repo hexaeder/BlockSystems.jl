@@ -337,7 +337,16 @@ function pairwise_cycle_free(idx, cycles)
     end
 end
 
-isalgebraic(eq::Equation) = eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
+function isalgebraic(eq::Equation)
+    if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
+        vars = get_variables(eq.lhs)
+        @assert length(vars) == 1
+        return vars[1] ∉ Set(get_variables(eq.rhs))
+    else
+        return false
+    end
+
+end
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 

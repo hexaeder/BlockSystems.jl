@@ -295,6 +295,11 @@ using LightGraphs
         @test !isalgebraic(D(y) ~ 0)
         @test isalgebraic(x ~ 0)
         @test isalgebraic(y ~ 0)
+        @test !isalgebraic(x ~ x^2)
+        @test !isalgebraic(y ~ y^2)
+        @test isalgebraic(y ~ x^2)
+        @test isalgebraic(y ~ x^2)
+        @test isalgebraic(x ~ y^2)
     end
 
     @testset "pairwise cycle free" begin
@@ -339,7 +344,6 @@ using LightGraphs
                        o1 ~ x + (y + o1),
                        D(y) ~ i]
 
-        # TODO: throws error! cant reduce cyclic algebraic state
-        # reduce_algebraic_states(reqs)
+        @test reduce_algebraic_states(reqs) == reqs
     end
 end
