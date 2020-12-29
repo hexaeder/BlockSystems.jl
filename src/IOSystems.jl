@@ -353,22 +353,4 @@ end
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
-"""
-The substitution only works if the Terms have the same eltype.
-"""
-fixtermtype(sym::Sym) = sym
-fixtermtype(term::Term{Real}) = term
-fixtermtype(term::Term{Parameter{Real}}) = Term{Real}(term.op, term.args)
-fixtermtype(pair::Pair{Symbolic, Symbolic}) = fixtermtype(pair.first)=>fixtermtype(pair.second)
-function fixtermtype(dict::Dict{Symbolic, Symbolic})
-    new = Dict{Symbolic, Symbolic}()
-    for pair in dict
-        push!(new, fixtermtype(pair))
-    end
-    new
-end
-
-# TODO: during namespace_equations the Term{Parameter{Real}} -> Term{Real} while the Sym{Parameter{Real}} stay at it is => PR in ModelingToolkit
-
-
 end
