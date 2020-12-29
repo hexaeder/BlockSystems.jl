@@ -84,10 +84,11 @@ using LightGraphs
     end
 
     @testset "iosystem asserts" begin
-        @parameters t i
+        @parameters t i(t)
         @variables o(t)
         iob1 = IOBlock([o~i],[i],[o],name=:name)
         iob2 = IOBlock([o~i],[i],[o],name=:name)
+
         # namespace collision
         @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2])
         iob2 = IOBlock([o~i],[i],[o])
@@ -211,95 +212,20 @@ using LightGraphs
         @test Set(sys.outputs) == Set([out])
     end
 
-    @testset "test of connect_system" begin
-        #=
-                    *------------*
-        in1 --> i1 -|    iob1    |
-        in2 --> i2 -|(x1, x2)(a) |-o--*     *-----*
-                    *------------*    *-ina-| add |- add ---> out
-                    *------------*    *-inb-|     |
-        in3 --> i1 -|    iob2    |-o--*     *-----*
-        in4 --> i2 -|(x1, x2)(b) |
-                    *------------*
-        =#
-        # same system as in testset before
-        @parameters t i1(t) i2(t) a b ina(t) inb(t)
-        @variables x1(t) x2(t) o(t) add(t)
-        @derivatives D'~t
-        eqs1  = [D(x1)~a*i1, D(x2)~i2, o~x1+x2]
-        iob1 = IOBlock(eqs1, [i1, i2], [o], name=:A)
-        eqs2  = [D(x1)~b*i1, D(x2)~i2, o~x1+x2]
-        iob2 = IOBlock(eqs2, [i1, i2], [o], name=:B)
-        ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
-        @parameters in1(t) in2(t) in3(t) in4(t)
-        @variables out
-        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
-                       [iob1, iob2, ioadd],
-                       inputs_map = Dict(iob1.i1 => in1,
-                                         iob1.i2 => in2,
-                                         iob2.i1 => in3,
-                                         iob2.i2 => in4),
-                       outputs_map = Dict(ioadd.add => out),
-                       name=:sys)
-        @show sys.inputs sys.iparams sys.istates sys.outputs
-
-        eqs = connect_system(sys)
-        ode = ODESystem(eqs)
-        states(ode)
-        parameters(ode)
-
-        equation_dependencies(ode)
-        variable_dependencies(ode)
-        asgraph(ode)
-
-        graph = eqeq_dependencies(asgraph(ode), variable_dependencies(ode))
-        edges(graph) |> collect
-
-        @parameters t i(t)
-        @variables x(t) y(t) z(t)
-        eqs = [D(x) ~ i,
-               D(y) ~ z,
-               D(z) ~ z]
-        ode = ODESystem(eqs)
-        graph = eqeq_dependencies(asgraph(ode), variable_dependencies(ode))
-        edges(graph) |> collect
-
-        has_self_loops(graph)
-        is_connected(graph)
-        connected_components(graph)
-
-        # get partions whit no leaving edges
-        # this means, this subset of equations is NOT used by the others
-        attracting_components(graph)
-
-        # test simplecycles
-        g = SimpleDiGraph(5)
-        add_edge!(g, 3=>1)
-        add_edge!(g, 3=>2)
-        add_edge!(g, 1=>1)
-        add_edge!(g, 1=>2)
-        add_edge!(g, 2=>2)
-        add_edge!(g, 4=>3)
-        add_edge!(g, 5=>3)
-        add_edge!(g, 4=>1)
-        cycles = simplecycles(g)
-
-    end
-
-    @testset "isalgebraic" begin
-        using IOSystems: isalgebraic
+    @testset "is_explicit_algebraic" begin
+        using IOSystems: is_explicit_algebraic
         @parameters t
         @variables x(t) y
         @derivatives D'~t
-        @test !isalgebraic(D(x) ~ 0)
-        @test !isalgebraic(D(y) ~ 0)
-        @test isalgebraic(x ~ 0)
-        @test isalgebraic(y ~ 0)
-        @test !isalgebraic(x ~ x^2)
-        @test !isalgebraic(y ~ y^2)
-        @test isalgebraic(y ~ x^2)
-        @test isalgebraic(y ~ x^2)
-        @test isalgebraic(x ~ y^2)
+        @test !is_explicit_algebraic(D(x) ~ 0)
+        @test !is_explicit_algebraic(D(y) ~ 0)
+        @test is_explicit_algebraic(x ~ 0)
+        @test is_explicit_algebraic(y ~ 0)
+        @test !is_explicit_algebraic(x ~ x^2)
+        @test !is_explicit_algebraic(y ~ y^2)
+        @test is_explicit_algebraic(y ~ x^2)
+        @test is_explicit_algebraic(y ~ x^2)
+        @test is_explicit_algebraic(x ~ y^2)
     end
 
     @testset "pairwise cycle free" begin
@@ -313,7 +239,6 @@ using LightGraphs
         add_edge!(g, 2=>3)
         add_edge!(g, 5=>4)
         cycles = simplecycles(g)
-
         @test pairwise_cycle_free([1,2,3,4,5], cycles) == [3,5]
     end
 
@@ -341,9 +266,80 @@ using LightGraphs
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs)
         @test reqs == [D(x) ~ i,
-                       o1 ~ x + (y + o1),
-                       D(y) ~ i]
+                       D(y) ~ i,
+                       o1 ~ x + (y + o1)]
 
         @test reduce_algebraic_states(reqs) == reqs
+
+        # test skip condition
+        eqs = [D(x) ~ i + o,
+               o ~ x + i]
+        reqs = reduce_algebraic_states(eqs, skip=[o])
+        @test reqs == eqs
+
+        eqs = [D(x) ~ i,
+               o1 ~ x + o2,
+               D(y) ~ i,
+               o2 ~ y + o1]
+        reqs = reduce_algebraic_states(eqs, skip=[o1])
+        @test reqs == [D(x) ~ i,
+                       D(y) ~ i,
+                       o1 ~ x + (y + o1)]
+
+        reqs = reduce_algebraic_states(eqs, skip=[o2])
+        @test reqs == [D(x) ~ i,
+                       D(y) ~ i,
+                       o2 ~ y + (x + o2)]
     end
+
+    @testset "substitute" begin
+        using IOSystems: eqsubstitute
+        @parameters t p i(t) pn inew(t)
+        @variables x(t) y xn(t) yn(t)
+        @derivatives D'~t
+        eq = D(x) ~ x + y + p + i
+        @test isequal(eqsubstitute(eq, x=>xn), D(xn) ~ xn + y + p + i)
+        @test isequal(eqsubstitute(eq, y=>yn), D(x) ~ x + yn + p + i)
+        @test isequal(eqsubstitute(eq, p=>pn), D(x) ~ x + y + pn + i)
+        @test isequal(eqsubstitute(eq, i=>inew), D(x) ~ x + y + p + inew)
+    end
+
+    @testset "test of connect_system" begin
+        #=
+                    *------------*
+        in1 --> i1 -|    iob1    |
+        in2 --> i2 -|(x1, x2)(a) |-o--*     *-----*
+                    *------------*    *-ina-| add |- add ---> out
+                    *------------*    *-inb-|     |
+        in3 --> i1 -|    iob2    |-o--*     *-----*
+        in4 --> i2 -|(x1, x2)(b) |
+                    *------------*
+        =#
+        # same system as in testset before
+        @parameters t i1(t) i2(t) a b ina(t) inb(t)
+        @variables x1(t) x2(t) o(t) add(t)
+        @derivatives D'~t
+        eqs1  = [D(x1)~a*i1, D(x2)~i2, o~x1+x2]
+        iob1 = IOBlock(eqs1, [i1, i2], [o], name=:A)
+        eqs2  = [D(x1)~b*i1, D(x2)~i2, o~x1+x2]
+        iob2 = IOBlock(eqs2, [i1, i2], [o], name=:B)
+        ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
+        @parameters in1(t) in2(t) in3(t) in4(t)
+        @variables out(t)
+        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+                       [iob1, iob2, ioadd],
+                       inputs_map = Dict(iob1.i1 => in1,
+                                         iob1.i2 => in2,
+                                         iob2.i1 => in3,
+                                         iob2.i2 => in4),
+                       outputs_map = Dict(ioadd.add => out),
+                       name=:sys)
+        @show sys.inputs sys.iparams sys.istates sys.outputs
+
+        iob = connect_system(sys)
+        @show iob.inputs iob.iparams iob.istates iob.outputs
+
+        # TODO: actual checks
+    end
+
 end

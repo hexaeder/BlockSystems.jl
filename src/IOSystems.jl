@@ -5,7 +5,7 @@ using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
 using ModelingToolkit: rename, getname, renamespace, namespace_equations
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
-using SymbolicUtils: Symbolic
+using SymbolicUtils: Symbolic, to_symbolic
 using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem, connect_system
@@ -68,7 +68,8 @@ end
 function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
     os = ODESystem(eqs, name = name)
 
-    # put asserts here
+    # TODO: check constrsaints to system of equations
+    # TODO: remove assertions in favour of errors
     @assert Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters"
     @assert Set(outputs) ⊆ Set(states(os)) "outputs musst be variables"
 
@@ -215,11 +216,8 @@ function fix_map_types(map)
     dict = Dict(map)
     newdict = Dict{Symbolic, Symbolic}()
     for k in keys(dict)
-        if dict[k] isa Num
-            newdict[k] = dict[k].val
-        else
-            newdict[k] = dict[k]
-        end
+        newkey = to_symbolic(k)
+        newdict[newkey] = to_symbolic(dict[k])
     end
     newdict
 end
@@ -272,7 +270,6 @@ function connect_system(ios::IOSystem)
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
 
     # get rid of closed inputs by substituting output states
-    # connections = fixtermtype(ios.connections)
     connections = ios.connections
     for (i, eq) in enumerate(eqs)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
@@ -283,33 +280,39 @@ function connect_system(ios::IOSystem)
     # - lhs only first order or algebraic
     # - no self loop in algeraic
 
-    # TODO: simplifying magic
-    # - get rid of unused states
-    # - get rid of algebraic states
+    # reduce algebraic states of the system
+    eqs = reduce_algebraic_states(eqs, skip = keys(ios.outputs_map))
 
-    # # apply the namespace transformations
-    # in_map = fixtermtype(ios.inputs_map)
-    # ip_map = fixtermtype(ios.iparams_map)
-    # is_map = fixtermtype(ios.istates_map)
-    # o_map  = fixtermtype(ios.outputs_map)
-    # namespace_promotion = merge(in_map, ip_map, is_map, o_map)
+    # TODO: possibly get red of unused states
+    # (internal variables which are not used for the outputs)
+    # hint: attracting_components(dependency graph)
+    # gets partions whitout leaving edges which means,
+    # this subset of equations is NOT used by the others
 
-    # for (i, eq) in enumerate(eqs)
-    #     eqs[i] = eqsubstitute(eq, namespace_promotion)
-    # end
+    # apply the namespace transformations
+    namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
 
-    eqs
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eqsubstitute(eq, namespace_promotion)
+    end
+
+    # eqs
+    IOBlock(eqs, ios.inputs, ios.outputs, name=ios.name)
 end
 
-function reduce_algebraic_states(eqs::Vector{Equation})
+function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
     eqs = deepcopy(eqs)
-    algebraic_idx = findall(isalgebraic, eqs)
+    sys = ODESystem(eqs) # will be used for the dependency graph
+    eqs = sys.eqs # the ODESystem might reorder the equations
+
+    # only consider states for reduction which are explicit algebraic and not in skip
+    condition = eq -> is_explicit_algebraic(eq) && !(Set(get_variables(eq.lhs)) ⊆ Set(skip))
+    algebraic_idx = findall(condition, eqs)
 
     # generate dependency graph
-    sys = ODESystem(eqs)
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
 
-    # an algebraic eq can be substituted if it is noch part of any cycle
+    # algebraic states which do no have cyclic dependencies between them can be reduced
     cycles = simplecycles(graph)
     reducable = pairwise_cycle_free(algebraic_idx, cycles)
     rules = [eq.lhs => eq.rhs for eq in eqs[reducable]]
@@ -337,7 +340,7 @@ function pairwise_cycle_free(idx, cycles)
     end
 end
 
-function isalgebraic(eq::Equation)
+function is_explicit_algebraic(eq::Equation)
     if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
         vars = get_variables(eq.lhs)
         @assert length(vars) == 1
