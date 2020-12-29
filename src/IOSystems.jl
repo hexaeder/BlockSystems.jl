@@ -275,7 +275,7 @@ function connect_system(ios::IOSystem)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
 
-    # TODO: poove assumtions
+    # TODO: check assumtions
     # - each state is represented by one lhs
     # - lhs only first order or algebraic
     # - no self loop in algeraic

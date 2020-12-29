@@ -334,12 +334,21 @@ using LightGraphs
                                          iob2.i2 => in4),
                        outputs_map = Dict(ioadd.add => out),
                        name=:sys)
-        @show sys.inputs sys.iparams sys.istates sys.outputs
-
         iob = connect_system(sys)
-        @show iob.inputs iob.iparams iob.istates iob.outputs
 
-        # TODO: actual checks
+        @test Set(sys.inputs) == Set(iob.inputs)
+        @test Set(sys.iparams) == Set(iob.iparams)
+        @test Set(sys.istates) == Set(iob.istates)
+        @test Set(sys.outputs) == Set(iob.outputs)
+        @test iob.name == sys.name
+
+        @variables A₊x1(t) A₊x2(t) B₊x1(t) B₊x2(t)
+        eqs = [D(A₊x1) ~ a * in1,
+               D(A₊x2) ~ in2,
+               D(B₊x1) ~ b * in3,
+               D(B₊x2) ~ in4,
+               out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
+        @test Set(eqs) == Set(iob.system.eqs)
     end
 
 end
