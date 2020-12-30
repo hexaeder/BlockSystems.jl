@@ -182,6 +182,9 @@ function IOSystem(cons,
         @assert isunique(values(outputs_map)) "rhs of outputs_map not unique"
     end
 
+    # FIXME : should nonreferenced outputs appear as istates?
+    # FIXME : possible namespace clashes between inputs/iparams/istates/outputs
+
     # the automatic namespace promotion is not aware of the names used
     # in the *_maps given by the user. Therfore a namespace clash might
     # happen. This won't be the case for outputs since there is no remaining
