@@ -20,6 +20,40 @@ using LightGraphs
         @test pairwise_cycle_free([1,2,3,4,5], cycles) == [3,5]
     end
 
+    @testset "reduce superflous states" begin
+        using IOSystems: reduce_superflous_states
+        @parameters t a b i(t)
+        @variables x(t) y(t) o(t) o1(t) o2(t)
+        @derivatives D'~t
+        eqs = [D(x) ~ x,
+               D(y) ~ y,
+               o ~ a^b]
+        reqs = reduce_superflous_states(eqs, [x])
+        @test reqs == eqs[[1]]
+        reqs = reduce_superflous_states(eqs, [y])
+        @test reqs == eqs[[2]]
+        reqs = reduce_superflous_states(eqs, [o])
+        @test reqs == eqs[[3]]
+        eqs = [D(x) ~ y,
+               D(y) ~ x+o,
+               o ~ a^b]
+        reqs = reduce_superflous_states(eqs, [y])
+        @test reqs == eqs
+        reqs = reduce_superflous_states(eqs, [x])
+        @test reqs == eqs
+        reqs = reduce_superflous_states(eqs, [o])
+        @test reqs == eqs[[3]]
+        eqs = [D(x) ~ x+o,
+               D(y) ~ y,
+               o ~ a^b]
+        reqs = reduce_superflous_states(eqs, [x])
+        @test reqs == eqs[[1,3]]
+        reqs = reduce_superflous_states(eqs, [y])
+        @test reqs == eqs[[2]]
+        reqs = reduce_superflous_states(eqs, [o])
+        @test reqs == eqs[[3]]
+    end
+
     @testset "reduce algebraic states" begin
         using IOSystems: reduce_algebraic_states
         @parameters t a b i(t)
@@ -104,7 +138,8 @@ using LightGraphs
 
         @test Set(sys.inputs) == Set(iob.inputs)
         @test Set(sys.iparams) == Set(iob.iparams)
-        @test Set(sys.istates) == Set(iob.istates)
+        # the connection will delete the states iob1.o and iob2.o
+        @test Set(sys.istates) == Set(iob.istates) ∪ Set([iob1.o, iob2.o])
         @test Set(sys.outputs) == Set(iob.outputs)
         @test iob.name == sys.name
 

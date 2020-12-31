@@ -20,17 +20,15 @@ function connect_system(ios::IOSystem)
     # - lhs only first order or algebraic
     # - no self loop in algeraic (not needed?)
     # - check that every variable found in the equations is referenced by namespacemap
+    # - dependency graph does not work correctly for implicit algebraic states! forbid them
+    #   -> does this have implications for the reduction of depended explicit a states?
 
-    eqs = reduce_superfluous_states(eqs, ios.outputs_map)
+    # get red of unused states
+    # (internal variables which are not used for the outputs)
+    eqs = reduce_superflous_states(eqs, keys(ios.outputs_map))
 
     # reduce algebraic states of the system
     eqs = reduce_algebraic_states(eqs, skip = keys(ios.outputs_map))
-
-    # TODO: possibly get red of unused states
-    # (internal variables which are not used for the outputs)
-    # hint: attracting_components(dependency graph)
-    # gets partions whitout leaving edges which means,
-    # this subset of equations is NOT used by the others
 
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
@@ -41,6 +39,32 @@ function connect_system(ios::IOSystem)
 
     # eqs
     IOBlock(eqs, ios.inputs, ios.outputs, name=ios.name)
+end
+
+function reduce_superflous_states(eqs::Vector{Equation}, outputs)
+    neweqs = deepcopy(eqs)
+    sys = ODESystem(neweqs) # will be used for the dependency graph
+    neweqs = sys.eqs # the ODESystem might reorder the equations
+    # generate dependency graph
+    graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
+    # find 'main' eq for each output
+    eq_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
+    # find the attracting components, remove attracting components which do not include eqs
+    attr_components = attracting_components(graph)
+    deleq = []
+    for attr in attr_components
+        if isempty(Set(eq_idx) ∩ Set(attr))
+            append!(deleq, attr)
+        end
+    end
+    deleteat!(neweqs, deleq)
+
+    # reduction has to be repeated recursively
+    if neweqs == eqs
+        return neweqs
+    else
+        return reduce_superflous_states(neweqs, outputs)
+    end
 end
 
 function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
