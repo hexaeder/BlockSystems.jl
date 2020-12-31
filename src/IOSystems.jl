@@ -133,6 +133,8 @@ function IOSystem(cons,
     @assert Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
     @assert Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
 
+    # TODO: assert the same iv
+
     # namespace promotion for inputs
     if inputs_map === nothing
         inputs_map = create_namespace_map(io_systems, :inputs, skip = first.(cons))
@@ -180,9 +182,15 @@ function IOSystem(cons,
         outputs_map = fix_map_types(outputs_map)
         @assert keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
         @assert isunique(values(outputs_map)) "rhs of outputs_map not unique"
+        # autonamespace all the other outputs
+        # the remaining outputs will be merged with the istates!
+        # as soon as an output is not specified in the map it is interpreted to be a
+        # potentially 'unnecessary' state of the system therefore istate
+        skip = Set(keys(outputs_map))
+        remaining = create_namespace_map(io_systems, :outputs, skip = skip)
+        istates_map = merge(istates_map, remaining)
     end
 
-    # FIXME : should nonreferenced outputs appear as istates?
     # FIXME : possible namespace clashes between inputs/iparams/istates/outputs
 
     # the automatic namespace promotion is not aware of the names used
@@ -192,8 +200,8 @@ function IOSystem(cons,
     @assert isunique(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
     @assert isunique(values(iparams_map)) "namespace promotion of iparams clashed with manually given inputs_map"
     @assert isunique(values(istates_map)) "namespace promotion of istates clashed with manually given inputs_map"
-
-    cons = Dict(cons)
+    @assert isunique(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespacepromotion not unique"
+    @assert isunique(vcat(collect.(values.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "rhs of namespacepromotion not unique"
 
     IOSystem(
         name,
@@ -201,7 +209,7 @@ function IOSystem(cons,
         collect(values(iparams_map)),
         collect(values(istates_map)),
         collect(values(outputs_map)),
-        cons,
+        Dict(cons),
         inputs_map,
         iparams_map,
         istates_map,

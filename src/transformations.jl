@@ -18,7 +18,10 @@ function connect_system(ios::IOSystem)
     # TODO: check assumtions
     # - each state is represented by one lhs
     # - lhs only first order or algebraic
-    # - no self loop in algeraic
+    # - no self loop in algeraic (not needed?)
+    # - check that every variable found in the equations is referenced by namespacemap
+
+    eqs = reduce_superfluous_states(eqs, ios.outputs_map)
 
     # reduce algebraic states of the system
     eqs = reduce_algebraic_states(eqs, skip = keys(ios.outputs_map))

@@ -1,6 +1,8 @@
 using Test
 using IOSystems
+using IOSystems: isunique
 using ModelingToolkit
+using ModelingToolkit: vars
 using LightGraphs
 
 @info "Testes of IOSystems.jl"
@@ -78,7 +80,6 @@ using LightGraphs
     end
 
     @testset "test isunique" begin
-        using IOSystems: isunique
         @test isunique([1,2,3])
         @test !isunique([1,1,3])
     end
@@ -140,6 +141,17 @@ using LightGraphs
                                              istates_map=[iob1.x => x])
     end
 
+    function test_complete_namespace_promotions(ios)
+        eqs = vcat([ModelingToolkit.namespace_equations(iob.system) for iob in ios.systems]...)
+        allvars = [(vars(eq.lhs) ∪ vars(eq.rhs)) for eq in eqs]
+        allvars = union(allvars...) |> unique
+        allvars = setdiff(allvars, [ ios.systems[1].system.iv ])
+        allkeys = vcat(collect.(keys.([ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map]))...)
+        allkeys = Set(allkeys) ∪ Set(keys(ios.connections))
+        @test isunique(allkeys)
+        @test Set(allkeys) == Set(allvars)
+    end
+
     @testset "test creation of systems" begin
         #=
                     *------------*
@@ -173,6 +185,7 @@ using LightGraphs
         @test Set(sys.iparams) == Set([a, b])
         @test Set(sys.istates) == Set([iob1.x1, iob1.x2, iob2.x1, iob2.x2])
         @test Set(sys.outputs) == Set([iob1.o, iob2.o, add])
+        test_complete_namespace_promotions(sys)
 
         # provide maps
         @parameters in1(t) in2(t) in3(t) in4(t) p1 p2
@@ -193,8 +206,9 @@ using LightGraphs
                        name=:sys)
         @test Set(sys.inputs) == Set([in1, in2, in3, in4])
         @test Set(sys.iparams) == Set([p1, p2])
-        @test Set(sys.istates) == Set([y1, y2, x1, x2])
+        @test Set(sys.istates) == Set([y1, y2, x1, x2, iob1.o, iob2.o])
         @test Set(sys.outputs) == Set([out])
+        test_complete_namespace_promotions(sys)
 
         # provide partial maps
         sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
@@ -208,8 +222,9 @@ using LightGraphs
                        name=:sys)
         @test Set(sys.inputs) == Set([in1, in2, i1, i2])
         @test Set(sys.iparams) == Set([p1, b])
-        @test Set(sys.istates) == Set([y1, y2, x1, x2])
+        @test Set(sys.istates) == Set([y1, y2, x1, x2, iob1.o, iob2.o])
         @test Set(sys.outputs) == Set([out])
+        test_complete_namespace_promotions(sys)
     end
 
     @testset "is_explicit_algebraic" begin
