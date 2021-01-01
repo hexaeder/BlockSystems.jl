@@ -1,28 +1,111 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example · IOSystems.jl</title><link rel="canonical" href="https://hexaeder.github.io/IOSystems.jl/generated/spacecraft/"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">IOSystems.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li class="is-active"><a class="tocitem" href>Example</a><ul class="internal"><li><a class="tocitem" href="#Controlsystem:-Spaceship"><span>Controlsystem: Spaceship</span></a></li><li><a class="tocitem" href="#Simple-proportional-controller"><span>Simple proportional controller</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Example</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Example</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/hexaeder/IOSystems_prototype/blob/master/examples/spacecraft.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="Controlsystem:-Spaceship"><a class="docs-heading-anchor" href="#Controlsystem:-Spaceship">Controlsystem: Spaceship</a><a id="Controlsystem:-Spaceship-1"></a><a class="docs-heading-anchor-permalink" href="#Controlsystem:-Spaceship" title="Permalink"></a></h2><p>As an example we want to build an IOSystem controlling the altitude of a small spaccraft. The spacecraft has mass <span>$m$</span> and can be controlled with thrusters wich applay the force <span>$F(t)$</span> to the spacecraft. The altitutude <span>$x(t)$</span></p><p class="math-container">\[\dot v(t) = \frac{ F(t) }{m}\\
-\dot x(t) =  v(t)\]</p><p>in our model this system has the input <span>$F(t)$</span>, the internal state <span>$v(t)$</span> and the output <span>$x(t)$</span>.</p><pre><code class="language-">using IOSystems
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example · IOSystems.jl</title><link rel="canonical" href="https://hexaeder.github.io/IOSystems.jl/generated/spacecraft/"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">IOSystems.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li class="is-active"><a class="tocitem" href>Example</a><ul class="internal"><li><a class="tocitem" href="#Control-System:-Spaceship"><span>Control System: Spaceship</span></a></li><li><a class="tocitem" href="#Simple-proportional-controller"><span>Simple proportional controller</span></a></li><li><a class="tocitem" href="#Simulate-System"><span>Simulate System</span></a></li><li><a class="tocitem" href="#Defining-a-better-controller"><span>Defining a better controller</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Example</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Example</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/hexaeder/IOSystems_prototype/blob/master/examples/spacecraft.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="Control-System:-Spaceship"><a class="docs-heading-anchor" href="#Control-System:-Spaceship">Control System: Spaceship</a><a id="Control-System:-Spaceship-1"></a><a class="docs-heading-anchor-permalink" href="#Control-System:-Spaceship" title="Permalink"></a></h2><p>As an example we want to build an IOSystem controlling the altitude of a spacecraft. The spacecraft has mass <span>$m$</span> and can be controlled with thrusters which apply the force <span>$F(t)$</span> to the spacecraft. The altitude <span>$x(t)$</span></p><p class="math-container">\[\dot v(t) = \frac{ F(t) }{m}\\
+\dot x(t) =  v(t)\]</p><p>in our model this system has the input <span>$F(t)$</span>, the internal state <span>$v(t)$</span> (vertical velocity) and the output <span>$x(t)$</span>.</p><pre><code class="language-none">       *------------*
+F(t) --| spacecraft |-- x(t)
+       | m, v(t)    |
+       *------------*
+</code></pre><pre><code class="language-">using IOSystems
 using ModelingToolkit
-@parameters t, m
-@variables x(t) F(t) v(t)
+@parameters t M F(t)
+@variables x(t) v(t)
 @derivatives D&#39;~t
 
-spacecraft = IOBlock([D(v) ~ F/m, D(x) ~ v], # define the equation
+spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
                      [F], # inputs of the system
                      [x], # outputs of the system
                      name = :spacecraft)
 @show spacecraft.inputs
 @show spacecraft.outputs
 @show spacecraft.istates
-nothing # hide</code></pre><p>We want to model a controler which takes a desired altituted as an input parameter and outputs the force for thrusters.</p><h2 id="Simple-proportional-controller"><a class="docs-heading-anchor" href="#Simple-proportional-controller">Simple proportional controller</a><a id="Simple-proportional-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-proportional-controller" title="Permalink"></a></h2><p>A proportional controller takes an input <span>$i$</span> and calculates the output proportional to the input.</p><p class="math-container">\[ o(t) = K\cdot i(t)\]</p><pre><code class="language-">@parameters K
-@variables o(t) i(t)
+nothing # hide</code></pre><p>We want to model a controller which takes a desired altitude as an input parameter and outputs the force for thrusters.</p><h2 id="Simple-proportional-controller"><a class="docs-heading-anchor" href="#Simple-proportional-controller">Simple proportional controller</a><a id="Simple-proportional-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-proportional-controller" title="Permalink"></a></h2><p>A proportional controller takes an input <span>$i$</span> and calculates the output proportional to the input.</p><p class="math-container">\[ o(t) = K\cdot i(t)\]</p><pre><code class="language-none">       *--------*
+i(t) --| prop K |-- o(t)
+       *--------*</code></pre><pre><code class="language-">@parameters K i(t)
+@variables o(t)
 
-prop = IOBlock([o ~ K*i], [i], [o], name = :prop)</code></pre><p>In order to make this usefull as an controller the input has to be the difference between the reference and the system variable (negativ feedback). We can model this as an IOSystem where</p><p class="math-container">\[Δ = p - m\]</p><pre><code class="language-">@variables Δ(t) p(t) m(t)
-diff = IOBlock([Δ ~ p - m], [p, m], [Δ], name=:diff)</code></pre><p>now we can connect both of the defined models to create an proportional controller</p><pre><code class="language-">propc = IOSystem([prop.i =&gt; diff.Δ], # conncect inptup of prop to output of diff
-                 [diff, prop], # define subsystems
-                 name=:propc)
-propc.inputs_map
-propc.istates_map
-propc.outputs_map
+prop = IOBlock([o ~ K*i], [i], [o], name = :prop)
+nothing # hide</code></pre><p>In order to make this useful as an controller, the input has to be the difference between the reference and the system variable (negative feedback). We can model this as an IOSystem where</p><p class="math-container">\[Δ = p - m\,.\]</p><pre><code class="language-none">       *--------*
+p(t) --|  diff  |-- Δ(t)
+m(t) --|        |
+       *--------*</code></pre><pre><code class="language-">@parameters p(t) m(t)
+@variables Δ(t)
+diff = IOBlock([Δ ~ p - m], [p, m], [Δ], name=:diff)
+nothing # hide</code></pre><p>Now we can connect both of the defined models to create an proportional controller</p><pre><code class="language-none">             *----------------------------------------*
+             | propc                                  |
+             |         *--------*   *--------*        |
+  target(t)--|--p(t) --|  diff  |---| prop K |--o(t)--|--o(t)
+feedback(t)--|--m(t) --|        |   *--------*        |
+             |         *--------*                     |
+             *----------------------------------------*</code></pre><p>If we don&#39;t provide additional information the system will try to promote all of the enclosed variables to the new syste mwide namespace.</p><pre><code class="language-">prop_c = IOSystem([prop.i =&gt; diff.Δ], # connect input of prop to output of diff
+                  [diff, prop], # subsystems
+                  name=:propc)
+@info &quot;namespace mapping&quot; prop_c.inputs_map prop_c.istates_map prop_c.outputs_map</code></pre><p>For finer control it is often prefered to give new names manually:</p><pre><code class="language-">@parameters target(t) feedback(t)
+prop_c = IOSystem([prop.i =&gt; diff.Δ], [diff, prop],
+                  outputs_map = [prop.o =&gt; o],
+                  inputs_map = [diff.p =&gt; target, diff.m =&gt; feedback],
+                  name=:propc)
+@info &quot;namespace mapping&quot; prop_c.inputs_map prop_c.istates_map prop_c.outputs_map</code></pre><p>Right now, the created object is a container for the two included systems. However, it is possible to transform the object into a new <code>IOBlock</code> by calling the <code>connect_system</code> function. The resulting is equivalent to</p><pre><code class="language-none">             *----------------------------------*
+  target(t)--| prop_c_block                     |--o(t)
+feedback(t)--| o(t)=K*(target(t) - feedback(t)) |
+             *----------------------------------*</code></pre><pre><code class="language-">prop_c_block = connect_system(prop_c)
+nothing #hide</code></pre><p>Now we can hook our spaceship to this controller. It does not matter whether we use the connected <code>IOBlock</code> version <code>prop_c</code> or the <code>IOSystem</code> version <code>prop_c_block</code>. We want to build the connected system</p><pre><code class="language-none">           *--------------------------------------------*
+           |  control system                            |
+           |       *--------*   *------------*          |
+target(t)--|-------| prop_c |---| spacecraft |-x(t)--*--|--altitude(t)
+           |  *-fb-|        |   | m, v(t)    |       |  |
+           |  |    *--------*   *------------*       |  |
+           |  *--------------------------------------*  |
+           *--------------------------------------------*</code></pre><pre><code class="language-">@variables altitude(t)
+space_controller = IOSystem([spacecraft.F =&gt; prop_c.o, prop_c.feedback =&gt; spacecraft.x],
+                            [prop_c, spacecraft],
+                            outputs_map = [spacecraft.x =&gt; altitude])
+# we want to reduce the space_controller to a block
+space_controller = connect_system(space_controller)
+@info &quot;Variables of space_controller&quot; space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs</code></pre><h2 id="Simulate-System"><a class="docs-heading-anchor" href="#Simulate-System">Simulate System</a><a id="Simulate-System-1"></a><a class="docs-heading-anchor-permalink" href="#Simulate-System" title="Permalink"></a></h2><p>In order to simulate the system we can have to build the Julia functions.</p><pre><code class="language-">gen = generate_io_function(space_controller)
+nothing # hide</code></pre><p>By doing so we get access to a named tuple with the fileds</p><ul><li><code>gen.f_ip</code> in-place function</li><li><code>gen.f_oop</code> out-of-place function</li><li><code>gen.massm</code> mass matrix of the system</li><li><code>gen.states</code> symbols of states (in order)</li><li><code>gen.inputs</code> symbols of inputs (in order)</li><li><code>gen.params</code> symbols of parameters (in order)</li></ul><p>The functions have the form <code>f_ip(du, u, inputs, params, t)</code> where <code>u</code> are all the states (outputs stacked on top of internal states) and <code>t</code> is the independent variable of the system. The order of the inputs and states can be controlled.</p><pre><code class="language-">gen = generate_io_function(space_controller, first_states=[altitude])
+@info &quot;Generated function&quot; gen.massm gen.states gen.inputs gen.params
+nothing # hide</code></pre><p>Well, let&#39;s see how our model is doing.</p><pre><code class="language-">using Plots
+using DifferentialEquations
+targetfun(t) = t&gt;1.0 ? 1.0 : 0
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [0.5, 1.0] # K, m
+u0 = [0.0, 0.0] # altitude, v
+tspan = (0.0, 30.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob)
+plot(t-&gt;sol(t)[1],tspan..., label=&quot;altitude&quot;, title=&quot;proportional control&quot;)
+plot!(t-&gt;targetfun(t),tspan..., label=&quot;target&quot;)</code></pre><p>Well who could have thought, proportional control looks like an harmonic oscillator 🤷‍♂️</p><h2 id="Defining-a-better-controller"><a class="docs-heading-anchor" href="#Defining-a-better-controller">Defining a better controller</a><a id="Defining-a-better-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Defining-a-better-controller" title="Permalink"></a></h2><p>We might just add a damping term (a force proportional to the velocity of the spaceship). If it works for a harmonic oscillator, it should work for our spaceship.</p><pre><code class="language-none">           *--------------------------------------------------------*
+           |  control system                                        |
+           |  *--------------------------------------------------*  |
+           |  |    *--------*     *---*                          |  |
+           |  *-v--| prop_v |-(-)-| d |     *------------*       |  |
+           |       *--------*     | i |--F--| spacecraft |-v(t)--*  |
+           |       *--------*     | f |     | m          |-x(t)--*--|--altitude(t)
+target(t)--|-------| prop_c |-(+)-| f |     *------------*       |  |
+           |  *-fb-|        |     *---*                          |  |
+           |  |    *--------*                                    |  |
+           |  *--------------------------------------------------*  |
+           *--------------------------------------------------------*</code></pre><p>In order to do so we have to slightly redefine the spaceship system: now the velocity <code>v(t)</code> is also an output and not and internal state.</p><pre><code class="language-">spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v],
+                     [F],
+                     [x,v],
+                     name = :spacecraft)</code></pre><p>One can define new blocks based on previously defined blocks.</p><pre><code class="language-">prop_v = IOBlock(prop, name=:prop_v)
+fdiff = IOBlock(diff, name=:fdiff)
 
-a=[x,i,o]
-ModelingToolkit.renamespace(:blubb,a[1])</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 30 December 2020 19:28">Wednesday 30 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+space_controller = IOSystem([prop_v.i =&gt; spacecraft.v,
+                             prop_c.feedback =&gt; spacecraft.x,
+                             fdiff.p =&gt; prop_c.o,
+                             fdiff.m =&gt; prop_v.o,
+                             spacecraft.F =&gt; fdiff.Δ],
+                            [prop_v, prop_c, fdiff, spacecraft],
+                            outputs_map = [spacecraft.x =&gt; altitude])
+
+space_controller = connect_system(space_controller)
+gen = generate_io_function(space_controller, first_states=[altitude])
+
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [1.0, 1.0, 0.5] # propc, M, propv
+u0 = [0.0, 0.0] # altitude, v
+tspan = (0.0, 30.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob, dtmax=0.1)
+plot(t-&gt;sol(t)[1],tspan..., label=&quot;altitude&quot;, title=&quot;better control&quot;)
+plot!(t-&gt;targetfun(t),tspan..., label=&quot;target&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 1 January 2021 23:31">Friday 1 January 2021</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
