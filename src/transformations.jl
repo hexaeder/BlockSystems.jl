@@ -25,20 +25,25 @@ function connect_system(ios::IOSystem)
 
     # get red of unused states
     # (internal variables which are not used for the outputs)
-    eqs = reduce_superflous_states(eqs, keys(ios.outputs_map))
+    reduced_eqs1 = reduce_superflous_states(eqs, keys(ios.outputs_map))
 
     # reduce algebraic states of the system
-    eqs = reduce_algebraic_states(eqs, skip = keys(ios.outputs_map))
+    reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
 
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
 
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = eqsubstitute(eq, namespace_promotion)
+    promoted_eqs = deepcopy(reduced_eqs2)
+    for (i, eq) in enumerate(promoted_eqs)
+        promoted_eqs[i] = eqsubstitute(eq, namespace_promotion)
     end
 
-    # eqs
-    IOBlock(eqs, ios.inputs, ios.outputs, name=ios.name)
+    try
+        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name)
+    catch e
+        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs
+        throw(e)
+    end
 end
 
 function reduce_superflous_states(eqs::Vector{Equation}, outputs)
@@ -57,7 +62,8 @@ function reduce_superflous_states(eqs::Vector{Equation}, outputs)
             append!(deleq, attr)
         end
     end
-    deleteat!(neweqs, deleq)
+    @assert isunique(deleq)
+    deleteat!(neweqs, sort(deleq))
 
     # reduction has to be repeated recursively
     if neweqs == eqs
