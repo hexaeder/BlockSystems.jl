@@ -128,6 +128,7 @@ function IOSystem(cons,
     @assert namespaces == unique(namespaces) "Namespace collision in subsystems!"
 
     # TODO: assert the same iv
+    # TODO: check for collision in sub namespaces? is this even a problem?
 
     @assert isunique(first.(cons)) "Multiple connections to same input!"
     namespaced_inputs = vcat([namespace_inputs(sys)

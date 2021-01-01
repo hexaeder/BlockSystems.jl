@@ -1,6 +1,6 @@
 export connect_system
 
-function connect_system(ios::IOSystem)
+function connect_system(ios::IOSystem; verbose=false)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -15,6 +15,8 @@ function connect_system(ios::IOSystem)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
 
+    verbose && @info "Transfom IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs eqs
+
     # TODO: check assumtions
     # - each state is represented by one lhs
     # - lhs only first order or algebraic
@@ -26,9 +28,11 @@ function connect_system(ios::IOSystem)
     # get red of unused states
     # (internal variables which are not used for the outputs)
     reduced_eqs1 = reduce_superflous_states(eqs, keys(ios.outputs_map))
+    verbose && @info "w/o superflous states" reduced_eqs1
 
     # reduce algebraic states of the system
     reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
+    verbose && @info "with reduced algebraic states" reduced_eqs2
 
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
@@ -37,6 +41,7 @@ function connect_system(ios::IOSystem)
     for (i, eq) in enumerate(promoted_eqs)
         promoted_eqs[i] = eqsubstitute(eq, namespace_promotion)
     end
+    verbose && @info "promoted namespaces" promoted_eqs
 
     try
         IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name)
@@ -74,13 +79,13 @@ function reduce_superflous_states(eqs::Vector{Equation}, outputs)
 end
 
 function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
-    eqs = deepcopy(eqs)
-    sys = ODESystem(eqs) # will be used for the dependency graph
-    eqs = sys.eqs # the ODESystem might reorder the equations
+    neweqs = deepcopy(eqs)
+    sys = ODESystem(neweqs) # will be used for the dependency graph
+    neweqs = sys.eqs # the ODESystem might reorder the equations
 
     # only consider states for reduction which are explicit algebraic and not in skip
     condition = eq -> is_explicit_algebraic(eq) && !(Set(get_variables(eq.lhs)) ⊆ Set(skip))
-    algebraic_idx = findall(condition, eqs)
+    algebraic_idx = findall(condition, neweqs)
 
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
@@ -88,13 +93,20 @@ function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
     # algebraic states which do no have cyclic dependencies between them can be reduced
     cycles = simplecycles(graph)
     reducable = pairwise_cycle_free(algebraic_idx, cycles)
-    rules = [eq.lhs => eq.rhs for eq in eqs[reducable]]
+    rules = [eq.lhs => eq.rhs for eq in neweqs[reducable]]
     # subsitute all the equations, remove substituted
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+    for (i, eq) in enumerate(neweqs)
+        neweqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
-    deleteat!(eqs, reducable)
-    return eqs
+    @assert isunique(reducable)
+    deleteat!(neweqs, sort(reducable))
+
+    # reduction has to be repeated recursively
+    if neweqs == eqs
+        return neweqs
+    else
+        return reduce_algebraic_states(neweqs, skip=skip)
+    end
 end
 
 function pairwise_cycle_free(idx, cycles)
