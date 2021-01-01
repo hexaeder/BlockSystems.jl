@@ -1,12 +1,12 @@
 #=
-## Controlsystem: Spaceship
-As an example we want to build an IOSystem controlling the altitude of a small spaccraft.
-The spacecraft has mass ``m`` and can be controlled with thrusters wich applay the force ``F(t)`` to the spacecraft. The altitutude ``x(t)``
+## Control System: Spaceship
+As an example we want to build an IOSystem controlling the altitude of a spacecraft.
+The spacecraft has mass ``m`` and can be controlled with thrusters which apply the force ``F(t)`` to the spacecraft. The altitude ``x(t)``
 ```math
 \dot v(t) = \frac{ F(t) }{m}\\
 \dot x(t) =  v(t)
 ```
-in our model this system has the input ``F(t)``, the internal state ``v(t)`` and the output ``x(t)``.
+in our model this system has the input ``F(t)``, the internal state ``v(t)`` (vertical velocity) and the output ``x(t)``.
 
 ```
        *------------*
@@ -33,7 +33,7 @@ spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
 nothing # hide
 
 #=
-We want to model a controler which takes a desired altituted as an input parameter and outputs the force for thrusters.
+We want to model a controller which takes a desired altitude as an input parameter and outputs the force for thrusters.
 
 ## Simple proportional controller
 A proportional controller takes an input ``i`` and calculates the output proportional to the input.
@@ -52,11 +52,11 @@ i(t) --| prop K |-- o(t)
 prop = IOBlock([o ~ K*i], [i], [o], name = :prop)
 nothing # hide
 #=
-In order to make this usefull as an controller the input has to be the difference
-between the reference and the system variable (negativ feedback). We can model this
+In order to make this useful as an controller, the input has to be the difference
+between the reference and the system variable (negative feedback). We can model this
 as an IOSystem where
 ```math
-Δ = p - m
+Δ = p - m\,.
 ```
 ```
        *--------*
@@ -70,7 +70,7 @@ m(t) --|        |
 diff = IOBlock([Δ ~ p - m], [p, m], [Δ], name=:diff)
 nothing # hide
 #=
-now we can connect both of the defined models to create an proportional controller
+Now we can connect both of the defined models to create an proportional controller
 
 ```
              *----------------------------------------*
@@ -101,7 +101,7 @@ prop_c = IOSystem([prop.i => diff.Δ], [diff, prop],
 @info "namespace mapping" prop_c.inputs_map prop_c.istates_map prop_c.outputs_map
 
 #=
-Right now, the created object is a container for the two included systems. However
+Right now, the created object is a container for the two included systems. However,
 it is possible to transform the object into a new `IOBlock` by calling the `connect_system`
 function. The resulting is equivalent to
 ```
@@ -112,6 +112,7 @@ feedback(t)--| o(t)=K*(target(t) - feedback(t)) |
 ```
 =#
 prop_c_block = connect_system(prop_c)
+nothing #hide
 
 #=
 Now we can hook our spaceship to this controller. It does not matter whether we use the
@@ -139,13 +140,13 @@ space_controller = connect_system(space_controller)
 
 
 #=
-## simulate system
+## Simulate System
 In order to simulate the system we can have to build the Julia functions.
 =#
 gen = generate_io_function(space_controller)
 nothing # hide
 #=
-By doing so we get access to
+By doing so we get access to a named tuple with the fileds
 - `gen.f_ip` in-place function
 - `gen.f_oop` out-of-place function
 - `gen.massm` mass matrix of the system
@@ -155,7 +156,7 @@ By doing so we get access to
 
 The functions have the form
 `f_ip(du, u, inputs, params, t)`
-where `u` are all the states (outputs stacked on top of internal states) and `t` is the independet variable of the system.
+where `u` are all the states (outputs stacked on top of internal states) and `t` is the independent variable of the system.
 The order of the inputs and states can be controlled.
 =#
 gen = generate_io_function(space_controller, first_states=[altitude])
@@ -178,66 +179,11 @@ plot(t->sol(t)[1],tspan..., label="altitude", title="proportional control")
 plot!(t->targetfun(t),tspan..., label="target")
 
 #=
-Well who could have thought, proportional control is no good here. But since the system is organized in blocks we can easily define a PI controller.
+Well who could have thought, proportional control looks like an harmonic oscillator 🤷‍♂️
 
 ## Defining a better controller
-
-```
-             *-----------------------------------------------*
-             | pi_c                                   *---*  |
-             |                           *------------|   |  |
-             |        *----*  *--------* | *-------*  |sum|--|--o(t)
-  target(t)--|--p(t)--|diff|--| prop K |-*-| int T |--|   |  |
-feedback(t)--|--m(t)--|    |  *--------*   *-------*  *---*  |
-             |        *----*                                 |
-             *-----------------------------------------------*
-```
-
-=#
-@parameters T a1(t) a2(t)
-@variables sum(t)
-int = IOBlock([D(o)~1/T * i], [i], [o], name=:int)
-adder = IOBlock([sum ~ a1 + a2], [a1, a2], [sum], name=:add)
-
-pi_c = IOSystem([prop.i => diff.Δ,
-                 int.i => prop.o,
-                 adder.a1 => prop.o,
-                 adder.a2 => int.o],
-                [diff, prop, int, adder],
-                outputs_map = [adder.sum => o],
-                inputs_map = [diff.p => target, diff.m => feedback],
-                name=:pi_c)
-nothing # hide
-
-# as before we can close the loop and build the control circuit
-
-space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft.x],
-                            [pi_c, spacecraft],
-                            outputs_map = [spacecraft.x => altitude])
-space_controller = connect_system(space_controller)
-@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
-
-
-# and we can simulate and plot the system
-gen = generate_io_function(space_controller, first_states=[altitude])
-gen.states
-
-odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
-p = [100, .1, 1.0] # T, K, m
-u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
-tspan = (0.0, 1000.0)
-prob = ODEProblem(odefun, u0, tspan, p)
-sol = solve(prob, dtmax=0.1)
-# plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
-# plot!(t->sol(t)[2],tspan..., label="int")
-plot(sol)
-plot!(t->targetfun(t),tspan..., label="target")
-plot!(yrange=(-0.5,2))
-
-
-#############################################################
-#############################################################
-#=
+We might just add a damping term (a force proportional to the velocity of the spaceship).
+If it works for a harmonic oscillator, it should work for our spaceship.
 ```
            *--------------------------------------------------------*
            |  control system                                        |
@@ -252,17 +198,17 @@ target(t)--|-------| prop_c |-(+)-| f |     *------------*       |  |
            |  *--------------------------------------------------*  |
            *--------------------------------------------------------*
 ```
+In order to do so we have to slightly redefine the spaceship system: now the velocity `v(t)` is also an output and not and internal state.
 =#
-
 
 spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v],
                      [F],
                      [x,v],
                      name = :spacecraft)
 
+# One can define new blocks based on previously defined blocks.
 prop_v = IOBlock(prop, name=:prop_v)
 fdiff = IOBlock(diff, name=:fdiff)
-prop_v.o
 
 space_controller = IOSystem([prop_v.i => spacecraft.v,
                              prop_c.feedback => spacecraft.x,
@@ -272,25 +218,14 @@ space_controller = IOSystem([prop_v.i => spacecraft.v,
                             [prop_v, prop_c, fdiff, spacecraft],
                             outputs_map = [spacecraft.x => altitude])
 
-
-
 space_controller = connect_system(space_controller)
-
-@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
-
-# and we can simulate and plot the system
 gen = generate_io_function(space_controller, first_states=[altitude])
-gen.states
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
-p = [1.0, 1.0, 1.0] # Ki, K, m
+p = [1.0, 1.0, 0.5] # propc, M, propv
 u0 = [0.0, 0.0] # altitude, v
 tspan = (0.0, 30.0)
 prob = ODEProblem(odefun, u0, tspan, p)
 sol = solve(prob, dtmax=0.1)
-# plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
-# plot!(t->sol(t)[2],tspan..., label="int")
-plot(sol)
+plot(t->sol(t)[1],tspan..., label="altitude", title="better control")
 plot!(t->targetfun(t),tspan..., label="target")
-plot!(yrange=(-0.5,2))
-nothing # hide
