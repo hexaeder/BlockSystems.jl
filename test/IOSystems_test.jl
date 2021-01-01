@@ -55,6 +55,28 @@ using LightGraphs
         @test Set(values(prom)) == Set([Aa, Ba, Ab, c, Ax, Bx, Ay, z])
     end
 
+    @testset "IOBlock from other IOBlock" begin
+        @parameters t i1(t) i2(t) a b
+        @variables x1(t) x2(t) o1(t) o2(t)
+        @derivatives D'~t
+        eqs = [D(x1) ~ a*i1,
+               D(x2) ~ b*i2,
+               o1 ~ a*x1,
+               o2 ~ b*x2]
+        iob1 = IOBlock(eqs, [i1, i2], [o1, o2], name=:iob1)
+        iob2 = IOBlock(iob1, name=:iob2)
+        iob3 = IOBlock(iob1)
+        @test iob1.name != iob2.name != iob3.name
+        @test Set(iob1.inputs) == Set(iob2.inputs) == Set(iob3.inputs)
+        @test Set(iob1.iparams) == Set(iob2.iparams) == Set(iob3.iparams)
+        @test Set(iob1.istates) == Set(iob2.istates) == Set(iob3.istates)
+        @test Set(iob1.outputs) == Set(iob2.outputs) == Set(iob3.outputs)
+        @test iob1.system.eqs == iob2.system.eqs == iob3.system.eqs
+        @test iob1.system.name == iob1.name
+        @test iob2.system.name == iob2.name
+        @test iob3.system.name == iob3.name
+    end
+
     @testset "test creation of namespace map" begin
         @parameters t i(t) a b
         @variables x(t) o(t)

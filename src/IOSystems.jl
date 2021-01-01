@@ -88,7 +88,7 @@ end
 
 function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
     cp = deepcopy(iob)
-    IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, cp.system)
+    IOBlock(cp.system.eqs, cp.inputs, cp.outputs, name=name)
 end
 
 """
