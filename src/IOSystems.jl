@@ -50,6 +50,7 @@ namespace_istates(ios::AbstractIOSystem) = namespace_property(ios, :istates)
 namespace_outputs(ios::AbstractIOSystem) = namespace_property(ios, :outputs)
 
 isunique(collection) = length(collection) == length(unique(collection))
+uniquenames(syms) = isunique(getname.(syms))
 
 """
 $(TYPEDEF)
@@ -121,9 +122,12 @@ function IOSystem(cons,
                   istates_map = nothing,
                   outputs_map = nothing,
                   name = gensym(:IOSystem),
+                  autopromote = true
                   )
     namespaces = [sys.name for sys in io_systems]
     @assert namespaces == unique(namespaces) "Namespace collision in subsystems!"
+
+    # TODO: assert the same iv
 
     @assert isunique(first.(cons)) "Multiple connections to same input!"
     namespaced_inputs = vcat([namespace_inputs(sys)
@@ -135,91 +139,76 @@ function IOSystem(cons,
     namespaced_outputs = vcat([namespace_outputs(sys)
                                for sys in io_systems]...)
 
+    # check validity of provided connections
     @assert Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
     @assert Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
+    # reduce the inputs to the open inputs
+    open_inputs = setdiff(namespaced_inputs, first.(cons))
 
-    # TODO: assert the same iv
+    # check validity of provided namespace maps
+    inputs_map = fix_map_types(inputs_map)
+    @assert keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
+    iparams_map = fix_map_types(iparams_map)
+    @assert keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
+    istates_map = fix_map_types(istates_map)
+    @assert keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
+    outputs_map = fix_map_types(outputs_map)
+    @assert keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
+    user_promotions = merge(inputs_map, iparams_map, istates_map, outputs_map)
+    @assert uniquenames(values(user_promotions)) "naming conflict in rhs of user provided namespace promotions"
 
-    # namespace promotion for inputs
-    if inputs_map === nothing
-        inputs_map = create_namespace_map(io_systems, :inputs, skip = first.(cons))
-    else
-        open_inputs = setdiff(namespaced_inputs, first.(cons))
-        inputs_map = fix_map_types(inputs_map)
-        @assert keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
-        @assert isunique(values(inputs_map)) "rhs of inputs_map not unique"
-        # autonamespace all the other inputs
-        skip = Set(keys(inputs_map)) ∪ first.(cons)
-        remaining = create_namespace_map(io_systems, :inputs, skip = skip)
-        inputs_map = merge(inputs_map, remaining)
+    # if the user provided a map of outputs, those outputs which are note referenced become states!
+    if !isempty(outputs_map)
+        former_outputs = setdiff(namespaced_outputs, keys(outputs_map))
+        namespaced_istates = vcat(namespaced_istates, former_outputs)
+        namespaced_outputs = keys(outputs_map) |> collect
     end
 
-    # namespace promotion for iparams
-    if iparams_map === nothing
-        iparams_map = create_namespace_map(io_systems, :iparams)
+    # auto promotion of the rest
+    if autopromote
+        all_symbols = vcat(open_inputs, namespaced_iparams, namespaced_istates, namespaced_outputs)
+        left_symbols = setdiff(all_symbols, keys(user_promotions))
+        auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
+        promotions = merge(user_promotions, auto_promotions)
     else
-        iparams_map = fix_map_types(iparams_map)
-        @assert keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
-        @assert isunique(values(iparams_map)) "rhs of iparams_map not unique"
-        # autonamespace all the other inputs
-        skip = Set(keys(iparams_map))
-        remaining = create_namespace_map(io_systems, :iparams, skip = skip)
-        iparams_map = merge(iparams_map, remaining)
+        promotions = user_promotions
     end
 
-    # namespace promotion for istates
-    if istates_map === nothing
-        istates_map = create_namespace_map(io_systems, :istates)
-    else
-        istates_map = fix_map_types(istates_map)
-        @assert keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
-        @assert isunique(values(istates_map)) "rhs of istates_map not unique"
-        # autonamespace all the other inputs
-        skip = Set(keys(istates_map))
-        remaining = create_namespace_map(io_systems, :istates, skip = skip)
-        istates_map = merge(istates_map, remaining)
+    in_map = Dict()
+    for s in open_inputs
+        in_map[s] = promotions[s]
+    end
+    ip_map = Dict()
+    for s in namespaced_iparams
+        ip_map[s] = promotions[s]
+    end
+    is_map = Dict()
+    for s in namespaced_istates
+        is_map[s] = promotions[s]
+    end
+    out_map = Dict()
+    for s in namespaced_outputs
+        out_map[s] = promotions[s]
     end
 
-    # namespace promotion for outputs
-    if outputs_map === nothing
-        outputs_map = create_namespace_map(io_systems, :outputs)
-    else
-        outputs_map = fix_map_types(outputs_map)
-        @assert keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
-        @assert isunique(values(outputs_map)) "rhs of outputs_map not unique"
-        # autonamespace all the other outputs
-        # the remaining outputs will be merged with the istates!
-        # as soon as an output is not specified in the map it is interpreted to be a
-        # potentially 'unnecessary' state of the system therefore istate
-        skip = Set(keys(outputs_map))
-        remaining = create_namespace_map(io_systems, :outputs, skip = skip)
-        istates_map = merge(istates_map, remaining)
-    end
-
-    # FIXME : possible namespace clashes between inputs/iparams/istates/outputs
-
-    # the automatic namespace promotion is not aware of the names used
-    # in the *_maps given by the user. Therfore a namespace clash might
-    # happen. This won't be the case for outputs since there is no remaining
-    # part which is promoted automatically.
-    @info "maps" inputs_map iparams_map istates_map outputs_map
-    @assert isunique(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
-    @assert isunique(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
-    @assert isunique(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
-    @assert isunique(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespacepromotion not unique"
-    @assert isunique(vcat(collect.(values.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "rhs of namespacepromotion not unique"
+    # assert that there are no namespace clashes. this should be allways true!
+    @assert uniquenames(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
+    @assert uniquenames(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
+    @assert uniquenames(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
+    @assert uniquenames(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespacepromotion not unique"
+    @assert uniquenames(vcat(collect.(values.([in_map, ip_map, is_map, out_map]))...)) "rhs of namespacepromotion not unique"
 
     IOSystem(
         name,
-        collect(values(inputs_map)),
-        collect(values(iparams_map)),
-        collect(values(istates_map)),
-        collect(values(outputs_map)),
+        collect(values(in_map)),
+        collect(values(ip_map)),
+        collect(values(is_map)),
+        collect(values(out_map)),
         Dict(cons),
-        inputs_map,
-        iparams_map,
-        istates_map,
-        outputs_map,
+        in_map,
+        ip_map,
+        is_map,
+        out_map,
         io_systems,
       )
 end
@@ -239,46 +228,24 @@ function fix_map_types(map)
     end
     newdict
 end
+fix_map_types(::Nothing) = Dict()
 
-"""
-    create_namespace_map(io_systems, property; skip =[])
-
-Creates dictionary from namespaced=>promoted symbols of property.
-
-property ∈ {:inputs, :iparams, :istates, :outputs}
-
-Tries to get rid of the namespace wherever possible. Namespaced symbols
-which should not be included in the resulting map can be specified using
-skip parameter.
-"""
-function create_namespace_map(io_systems, property; skip = [])
-    all = vcat((getproperty(ios, property) for ios in io_systems)...)
-    all_spaced = vcat((namespace_property(ios, property) for ios in io_systems)...)
-
-    # namespaced => non-namespaced pairs
-    pairs = [Pair(t...) for t in zip(all_spaced, all)]
-    # filter out values which should be skipped (i.e. connected inputs)
-    filter!(x -> first(x) ∉ Set(skip), pairs)
-
-    # find duplicates and add namepsaces
-    duplicates = Set()
-    for i in 1:length(pairs)
-        if last(pairs[i]) ∈ Set(last.(pairs[i+1:end]))
-            push!(duplicates, last(pairs[i]))
-        end
+function create_namespace_promotions(syms, forbidden)
+    promoted = remove_namespace.(syms)
+    dict = Dict()
+    for i in 1:length(syms)
+        forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
+        dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
     end
-    # no namespace promotion for duplicates
-    not_promoted = []
-    for i in 1:length(pairs)
-        if pairs[i].second ∈ duplicates
-            pairs[i] = pairs[i].first => pairs[i].first
-            push!(not_promoted, pairs[i].first)
-        end
-    end
-    isempty(not_promoted) || @warn "Could not promote all symbols to system namespace" not_promoted
-
-    return Dict(pairs)
+    return dict
 end
+
+remove_namespace(namespace, name::T) where T = T(replace(String(name), Regex("^$(namespace)₊") => ""))
+remove_namespace(namespace, x::Sym) = rename(x, remove_namespace(namespace, x.name))
+remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, x.op.name))
+remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") => ""))
+remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
+remove_namespace(x::Term) = rename(x, remove_namespace(x.op.name))
 
 function is_explicit_algebraic(eq::Equation)
     if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)

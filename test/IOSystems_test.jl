@@ -2,7 +2,7 @@ using Test
 using IOSystems
 using IOSystems: isunique
 using ModelingToolkit
-using ModelingToolkit: vars
+using ModelingToolkit: vars, value
 using LightGraphs
 
 @info "Testes of IOSystems.jl"
@@ -39,8 +39,23 @@ using LightGraphs
         @test_throws AssertionError IOBlock(eqs, [i1,i2], [i1,o1,o2])
     end
 
+    @testset "test of create_namespace_promotions" begin
+        using ModelingToolkit: value
+        using IOSystems: create_namespace_promotions
+        @parameters t
+        Aa, Ba, Ab, Bc = value.(@parameters A₊a B₊a(t) A₊b B₊c)
+        Ax, Bx, Ay, Bz = value.(@variables A₊x(t) B₊x(t) A₊y(t) B₊z(t))
+        b, c = value.(@parameters b c)
+        y, z = value.(@variables y(t) z(t))
+
+        prom = create_namespace_promotions([Aa, Ba, Ab, Bc, Ax, Bx, Ay, Bz], [])
+        @test Set(values(prom)) == Set([Aa, Ba, b, c, Ax, Bx, y, z])
+
+        prom = create_namespace_promotions([Aa, Ba, Ab, Bc, Ax, Bx, Ay, Bz], [b, y])
+        @test Set(values(prom)) == Set([Aa, Ba, Ab, c, Ax, Bx, Ay, z])
+    end
+
     @testset "test creation of namespace map" begin
-        using IOSystems: create_namespace_map
         @parameters t i(t) a b
         @variables x(t) o(t)
         @derivatives D'~t
@@ -62,26 +77,22 @@ using LightGraphs
         @test Set(iob1.iparams) == Set([a, b])
         @test Set(iob2.iparams) == Set(a)
 
-        in  = create_namespace_map([iob1, iob2], :inputs)
-        in_ex = [iob1.i => i, iob2.i2 => i2]
-        @test Set(in) == Set(in_ex)
-
-        params  = create_namespace_map([iob1, iob2], :iparams)
-        params_ex = [iob1.a => iob1.a, iob1.b => b, iob2.a => iob2.a]
-        @test Set(params) == Set(params_ex)
-
-        out = create_namespace_map([iob1, iob2], :outputs)
-        out_ex = [iob1.o => iob1.o, iob2.o => iob2.o]
-        @test Set(out) == Set(out_ex)
-
-        var = create_namespace_map([iob1, iob2], :istates)
-        var_ex = [iob1.x => iob1.x, iob2.x => iob2.x, iob2.x2 => x2]
-        @test Set(var) == Set(var_ex)
+        sys = IOSystem([], [iob1, iob2])
+        @test Set(sys.inputs) == Set([i, i2])
+        @test Set(sys.istates) == Set([iob1.x, iob2.x, x2])
+        @test Set(sys.iparams) == Set([iob1.a, iob2.a, b])
+        @test Set(sys.outputs) == Set([iob1.o, iob2.o])
     end
 
     @testset "test isunique" begin
+        using IOSystems: uniquenames
         @test isunique([1,2,3])
         @test !isunique([1,1,3])
+
+        (t, a, b, mp) = value.(@parameters t a b(t) m)
+        (x, y, mv) = value.(@variables x y(t) m)
+        @test uniquenames([a, b, x, y, mp])
+        @test !uniquenames([a, b, x, y, mp, mv])
     end
 
     @testset "iosystem asserts" begin
@@ -131,14 +142,6 @@ using LightGraphs
                  outputs_map = [iob1.o=>y, iob2.o=>y])
         @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  outputs_map = [iob1.a=>y])
-
-        # error of namespace clashes
-        @test_throws AssertionError IOSystem([],[iob1, iob2],
-                                             inputs_map=[iob1.i => i])
-        @test_throws AssertionError IOSystem([],[iob1, iob2],
-                                             iparams_map=[iob1.a => a])
-        @test_throws AssertionError IOSystem([],[iob1, iob2],
-                                             istates_map=[iob1.x => x])
     end
 
     function test_complete_namespace_promotions(ios)
@@ -168,14 +171,11 @@ using LightGraphs
         @derivatives D'~t
         eqs1  = [D(x1)~a*i1, D(x2)~i2, o~x1+x2]
         iob1 = IOBlock(eqs1, [i1, i2], [o], name=:iob1)
-        @show iob1.inputs iob1.istates iob1.iparams iob1.outputs;
 
         eqs2  = [D(x1)~b*i1, D(x2)~i2, o~x1+x2]
         iob2 = IOBlock(eqs2, [i1, i2], [o], name=:iob2)
-        @show iob2.inputs iob2.istates iob2.iparams iob2.outputs;
 
         ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
-        @show ioadd.inputs ioadd.istates ioadd.iparams ioadd.outputs;
 
         # try with auto namespacing
         sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
@@ -255,4 +255,28 @@ using LightGraphs
         @test isequal(eqsubstitute(eq, i=>inew), D(x) ~ x + y + p + inew)
     end
 
+    @testset "remove namespace of symbols" begin
+        using IOSystems: remove_namespace
+        using ModelingToolkit: renamespace, to_symbolic, rename
+        @parameters t a b(t)
+        a = to_symbolic(a)
+        b = to_symbolic(b)
+        an = rename(a, renamespace(:ns, a.name))
+        bn = rename(b, renamespace(:ns, b.op.name))
+        @test remove_namespace(:ns, :ns₊n) == :n
+        @test remove_namespace("ns", "ns₊n") == "n"
+        @test isequal(remove_namespace(:ns, an), a)
+        @test isequal(remove_namespace(:ns, a), a)
+        @test isequal(remove_namespace(:ns, bn), b)
+        @test isequal(remove_namespace(:ns, b), b)
+
+        @test remove_namespace(:ns₊n) == :n
+        @test remove_namespace("ns₊n") == "n"
+        @test remove_namespace(:ns₊ns2₊n) == :ns2₊n
+        @test remove_namespace("ns₊ns2₊n") == "ns2₊n"
+        @test isequal(remove_namespace(an), a)
+        @test isequal(remove_namespace(a), a)
+        @test isequal(remove_namespace(bn), b)
+        @test isequal(remove_namespace(b), b)
+    end
 end

@@ -1,9 +1,5 @@
 export generate_io_function
 
-remove_namespace(namespace, name::T) where T = T(replace(String(name), Regex("^$(namespace)₊") => ""))
-remove_namespace(namespace, x::Sym) = rename(x, remove_namespace(namespace, x.name))
-remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, x.op.name))
-
 function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false})
     if ios isa IOSystem
         ios = connect_system(ios)

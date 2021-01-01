@@ -6,22 +6,6 @@ using LinearAlgebra
 @info "Testes of function_generation.jl"
 
 @testset "function_generation.jl" begin
-    @testset "remove namespace of symbols" begin
-        using IOSystems: remove_namespace
-        using ModelingToolkit: renamespace, to_symbolic, rename
-        @parameters t a b(t)
-        a = to_symbolic(a)
-        b = to_symbolic(b)
-        an = rename(a, renamespace(:ns, a.name))
-        bn = rename(b, renamespace(:ns, b.op.name))
-        @test remove_namespace(:ns, :ns₊n) == :n
-        @test remove_namespace("ns", "ns₊n") == "n"
-        @test isequal(remove_namespace(:ns, an), a)
-        @test isequal(remove_namespace(:ns, a), a)
-        @test isequal(remove_namespace(:ns, bn), b)
-        @test isequal(remove_namespace(:ns, b), b)
-    end
-
     @testset "transform algebraic equations" begin
         using IOSystems: transform_algebraic_equations
         @parameters t a b
