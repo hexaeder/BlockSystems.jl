@@ -1,5 +1,26 @@
 export generate_io_function
 
+"""
+$(SIGNATURES)
+
+Generate calleble functions for an `AbstractIOSystem`. An `IOSystem` will be transformed to an `IOBlock` first.
+
+Parameters:
+- `ios`: the system to build the function
+- `first_states`: define states=(istates ∪ outputs) which shoud appar first
+- `first_inputs`: define inputs which shoud appar first
+- `simplify=true`: call simplify on the equations before building?
+- `expression=Val{false}`: toggle expression and callable function output
+
+Returns an named tuple with the fields
+- `f_ip` in-place function `f(dstates, states, inputs, params, iv)`
+- `f_oop` out-of-place function `f(states, inputs, params, iv)=>dstates`
+- `massm` mass matrix of the system
+- `states` symbols of states (in order)
+- `inputs` symbols of inputs (in order)
+- `params` symbols of parameters (in order)
+
+"""
 function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false})
     if ios isa IOSystem
         ios = connect_system(ios)

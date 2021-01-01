@@ -11,19 +11,8 @@ using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem
 
-@doc raw"""
-    AbstractIOSystem
-
-Basic type for IOSystems. Such systems contains a ODEProblem of the form
-```math
-\begin{aligned}
-\dot \mathbf x(t) &= f( \mathbf i(t) )\\
-\mathbf o(t) &= g(\mathbf x(t), \mathbf i(t))
-\end{aligned}
-```
-where the states can be separated into `states = inputs ∪ istates ∪ outputs` (`istates` is short for `internalstates`).
-
-Each `AIOS` has a `name` field generating a namespace. The symbols of the
+"""
+abstract supertype for [IOBlock](@ref) and [IOSystem](@ref).
 """
 abstract type AbstractIOSystem end
 
@@ -55,7 +44,7 @@ uniquenames(syms) = isunique(getname.(syms))
 """
 $(TYPEDEF)
 
-A basic IOSystem which consists of a single ODESystems.
+A basic IOSystem which consists of a single ODESystem.
 $(TYPEDFIELDS)
 """
 struct IOBlock <: AbstractIOSystem
@@ -67,6 +56,22 @@ struct IOBlock <: AbstractIOSystem
     system::ODESystem
 end
 
+"""
+$(SIGNATURES)
+
+Construct a new IOBlock for the given arguments.
+
+```jldoctest; output=false
+using IOSystems, ModelingToolkit
+@parameters t i(t)
+@variables x(t) o(t)
+@derivatives D'~t
+
+iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
+# output
+IOBlock(:iob, Symbolic[i(t)], Symbolic[], Symbolic[x(t)], Symbolic[o(t)], ODESystem(Equation[Equation(Differential(x(t)), i(t)), Equation(o(t), x(t))], t, Term{Real}[x(t), o(t)], Term{ModelingToolkit.Parameter{Real}}[i(t)], Num[], Equation[], Base.RefValue{Array{Num,1}}(Num[]), Base.RefValue{Any}(Array{Num}(undef,0,0)), Base.RefValue{Array{Num,2}}(Array{Num}(undef,0,0)), Base.RefValue{Array{Num,2}}(Array{Num}(undef,0,0)), :iob, ODESystem[]))
+```
+"""
 function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
     os = ODESystem(eqs, name = name)
 
@@ -94,10 +99,13 @@ end
 """
 $(TYPEDEF)
 
-A composit IOSystem which consists of multipe `AbstractIOSystem`(@ref) wich are connected via
+A composite `IOSystem` which consists of multiple [`AbstractIOSystem`](@ref) which are connected via
 a vector of namespaced pairs (`subsys1.out1 => subsys2.in1`).
-The inputs and outputs of the composit system are declared in the namespace of the new composit
-system but point to namespaced variables of the subsystems.
+
+An `IOSystem` contains maps how to promote the namespaced variables of the subystem to the new scope
+   subsys1₊x(t) => x(t)
+   subsys1₊y(t) => subsys1₊y(t)
+   subsys2₊y(t) => subsys2₊y(t)
 
 $(TYPEDFIELDS)
 """
@@ -115,6 +123,25 @@ struct IOSystem <: AbstractIOSystem
     systems::Vector{AbstractIOSystem}
 end
 
+"""
+$(SIGNATURES)
+
+Construct a new IOSystem from various subsystems.
+Parameters
+ - `cons`: the connections in the form `sub2.input => sub2.output`
+ - `io_systems`: Vector of subsystems
+ - `inputs_map`, `iparams_map`, `istates_map`:
+   Provide custom namespace promotion / renaming i.e. `sub1.input => voltage`.
+   Variables without entry in the map will be promoted automatically.
+ - `outputs_map`:
+   Provide custom namespace promotion for outputs. If this parameter is not given,
+   all of the outputs (connected and unconnected) will be marked as outputs of the whole
+   system. If the outputs map is given only the given outputs will be marked as outputs.
+   All other outputs of subsystems will become internal states of the connected system
+   (and might be optimized away in `connect_system`).
+ - `name`: namespace
+ - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
+"""
 function IOSystem(cons,
                   io_systems::Vector{<:AbstractIOSystem};
                   inputs_map = nothing,

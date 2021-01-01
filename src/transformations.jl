@@ -1,5 +1,19 @@
 export connect_system
 
+"""
+$(SIGNATURES)
+
+Recursively transform `IOSystems` to `IOBlocks`.
+
+- substitute inputs with connected outputs
+- try to eliminate equations for internal states which are not used to calculate the specified outputs of the system.
+- try to eliminate explicit algebraic equations (i.e. outputs of internal blocks) by substituting each occurence
+  with their rhs. Explicit algebraic states which are marked as system outputs won't be reduced.
+
+Parameters:
+- `ios`: system to connect
+- `verbose=false`: toggle verbosity (show equations at different steps)
+"""
 function connect_system(ios::IOSystem; verbose=false)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
