@@ -18,7 +18,7 @@ function connect_system(ios::IOSystem; verbose=false)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
-            ios.systems[i] = connect_system(subsys)
+            ios.systems[i] = connect_system(subsys, verbose=verbose)
         end
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
