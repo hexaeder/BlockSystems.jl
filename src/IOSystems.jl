@@ -85,6 +85,11 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym
     IOBlock(name, inputs, iparams, istates, outputs, os)
 end
 
+function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
+    cp = deepcopy(iob)
+    IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, cp.system)
+end
+
 """
 $(TYPEDEF)
 
@@ -197,9 +202,10 @@ function IOSystem(cons,
     # in the *_maps given by the user. Therfore a namespace clash might
     # happen. This won't be the case for outputs since there is no remaining
     # part which is promoted automatically.
+    @info "maps" inputs_map iparams_map istates_map outputs_map
     @assert isunique(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
-    @assert isunique(values(iparams_map)) "namespace promotion of iparams clashed with manually given inputs_map"
-    @assert isunique(values(istates_map)) "namespace promotion of istates clashed with manually given inputs_map"
+    @assert isunique(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
+    @assert isunique(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
     @assert isunique(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespacepromotion not unique"
     @assert isunique(vcat(collect.(values.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "rhs of namespacepromotion not unique"
 

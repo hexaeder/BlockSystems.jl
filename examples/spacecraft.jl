@@ -19,11 +19,11 @@ F(t) --| spacecraft |-- x(t)
 
 using IOSystems
 using ModelingToolkit
-@parameters t m F(t)
+@parameters t M F(t)
 @variables x(t) v(t)
 @derivatives D'~t
 
-spacecraft = IOBlock([D(v) ~ F/m, D(x) ~ v], # define the equation
+spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
                      [F], # inputs of the system
                      [x], # outputs of the system
                      name = :spacecraft)
@@ -215,19 +215,82 @@ space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft
                             [pi_c, spacecraft],
                             outputs_map = [spacecraft.x => altitude])
 space_controller = connect_system(space_controller)
+@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
+
 
 # and we can simulate and plot the system
 gen = generate_io_function(space_controller, first_states=[altitude])
+gen.states
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
-p = [-100, .1, 1.0] # T, K, m
+p = [100, .1, 1.0] # T, K, m
 u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
 tspan = (0.0, 1000.0)
 prob = ODEProblem(odefun, u0, tspan, p)
 sol = solve(prob, dtmax=0.1)
-plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
-plot!(t->sol(t)[2],tspan..., label="int")
+# plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
+# plot!(t->sol(t)[2],tspan..., label="int")
+plot(sol)
 plot!(t->targetfun(t),tspan..., label="target")
 plot!(yrange=(-0.5,2))
-plot!(sol)
-sol
+
+
+#############################################################
+#############################################################
+#=
+```
+           *--------------------------------------------------------*
+           |  control system                                        |
+           |  *--------------------------------------------------*  |
+           |  |    *--------*     *---*                          |  |
+           |  *-v--| prop_v |-(-)-| d |     *------------*       |  |
+           |       *--------*     | i |--F--| spacecraft |-v(t)--*  |
+           |       *--------*     | f |     | m          |-x(t)--*--|--altitude(t)
+target(t)--|-------| prop_c |-(+)-| f |     *------------*       |  |
+           |  *-fb-|        |     *---*                          |  |
+           |  |    *--------*                                    |  |
+           |  *--------------------------------------------------*  |
+           *--------------------------------------------------------*
+```
+=#
+
+
+spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v],
+                     [F],
+                     [x,v],
+                     name = :spacecraft)
+
+prop_v = IOBlock(prop, name=:prop_v)
+fdiff = IOBlock(diff, name=:fdiff)
+prop_v.o
+
+space_controller = IOSystem([prop_v.i => spacecraft.v,
+                             prop_c.feedback => spacecraft.x,
+                             fdiff.p => prop_c.o,
+                             fdiff.m => prop_v.o,
+                             spacecraft.F => fdiff.Δ],
+                            [prop_v, prop_c, fdiff, spacecraft],
+                            outputs_map = [spacecraft.x => altitude])
+
+
+
+space_controller = connect_system(space_controller)
+
+@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
+
+# and we can simulate and plot the system
+gen = generate_io_function(space_controller, first_states=[altitude])
+gen.states
+
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [1.0, 1.0, 1.0] # Ki, K, m
+u0 = [0.0, 0.0] # altitude, v
+tspan = (0.0, 30.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob, dtmax=0.1)
+# plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
+# plot!(t->sol(t)[2],tspan..., label="int")
+plot(sol)
+plot!(t->targetfun(t),tspan..., label="target")
+plot!(yrange=(-0.5,2))
+nothing # hide
