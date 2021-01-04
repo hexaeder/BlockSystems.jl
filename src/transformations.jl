@@ -23,13 +23,16 @@ function connect_system(ios::IOSystem; verbose=false)
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
 
+    verbose && @info "Transfom IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs ios.connections eqs
+
     # get rid of closed inputs by substituting output states
     connections = ios.connections
     for (i, eq) in enumerate(eqs)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
 
-    verbose && @info "Transfom IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs eqs
+    verbose && @info "subsitute inputs with outputs" eqs
+
 
     # TODO: check assumtions
     # - each state is represented by one lhs

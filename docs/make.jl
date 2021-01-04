@@ -1,7 +1,10 @@
 using IOSystems
 using Documenter
 using Literate
+
 using Plots
+using DifferentialEquations
+using ModelingToolkit
 
 # generate examples
 EXAMPLE = joinpath(@__DIR__, "..", "examples", "spacecraft.jl")

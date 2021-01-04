@@ -77,8 +77,8 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym
 
     # TODO: check constraints to system of equations
     # TODO: remove assertions in favour of errors
-    @assert Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters"
-    @assert Set(outputs) ⊆ Set(states(os)) "outputs musst be variables"
+    @assert Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters: $(Set(inputs)) !⊆ $(Set(parameters(os)))"
+    @assert Set(outputs) ⊆ Set(states(os)) "outputs musst be variables: $(Set(outputs)) !⊆ $(Set(states(os)))"
 
     inputs = parameters(os) ∩ inputs # gets the inputs as `tern` type
     outputs = os.states ∩ outputs # gets the outputs as `tern` type
