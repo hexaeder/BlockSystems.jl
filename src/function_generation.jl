@@ -52,7 +52,7 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
 
     # create massmatrix, we don't use the method provided by ODESystem because of reordering
     mass_matrix = generate_massmatrix(eqs)
-    verbose && @info "Reordered by states an generated mass matrix" eqs states massmatrix
+    verbose && @info "Reordered by states and generated mass matrix" eqs states mass_matrix
 
     # substitute x(t) by x for all terms
     state_syms = makesym.(states, states=[])

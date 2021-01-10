@@ -48,13 +48,11 @@ function connect_system(ios::IOSystem; verbose=false)
     verbose && @info "w/o superflous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    # TODO tis should not work?
-    # ol = IOSystem([D(x) ~ a * x + b * u,
-    #                y ~ c * x + d*u]; inputs = [u], outputs = [y])
     # TODO maximal acylic induced subgraph that is a tree?
     reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
     verbose && @info "with reduced algebraic states" reduced_eqs2
 
+    # TODO redo namespace promotion after deletion of states?
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
 
