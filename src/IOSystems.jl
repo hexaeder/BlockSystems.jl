@@ -12,7 +12,7 @@ using LightGraphs
 export AbstractIOSystem, IOBlock, IOSystem
 
 """
-abstract supertype for [IOBlock](@ref) and [IOSystem](@ref).
+abstract supertype for [`IOBlock`](@ref) and [`IOSystem`](@ref).
 """
 abstract type AbstractIOSystem end
 
@@ -61,15 +61,13 @@ $(SIGNATURES)
 
 Construct a new IOBlock for the given arguments.
 
-```jldoctest; output=false
+```@example
 using IOSystems, ModelingToolkit
 @parameters t i(t)
 @variables x(t) o(t)
 @derivatives D'~t
 
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
-# output
-IOBlock(:iob, Symbolic[i(t)], Symbolic[], Symbolic[x(t)], Symbolic[o(t)], ODESystem(Equation[Equation(Differential(x(t)), i(t)), Equation(o(t), x(t))], t, Term{Real}[x(t), o(t)], Term{ModelingToolkit.Parameter{Real}}[i(t)], Num[], Equation[], Base.RefValue{Array{Num,1}}(Num[]), Base.RefValue{Any}(Array{Num}(undef,0,0)), Base.RefValue{Array{Num,2}}(Array{Num}(undef,0,0)), Base.RefValue{Array{Num,2}}(Array{Num}(undef,0,0)), :iob, ODESystem[]))
 ```
 """
 function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
