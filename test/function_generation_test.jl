@@ -52,6 +52,9 @@ using LinearAlgebra
         @test reorder_by_states(eqs, [y,b,x,a]) == eqs[[2,3,1,4]]
         @test reorder_by_states(eqs, [x,b,y,a]) == eqs[[1,3,2,4]]
         @test reorder_by_states(eqs, [b,x,y,a]) == eqs[[3,1,2,4]]
+
+        eqs = [0 ~ x+y]
+        @test reorder_by_states(eqs, [x]) == eqs
     end
 
     @testset "generate_massmatrix" begin

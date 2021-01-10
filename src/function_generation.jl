@@ -83,7 +83,7 @@ end
 function reorder_by_states(eqs::AbstractVector{Equation}, states)
     @assert length(eqs) == length(states) "Numbers of eqs should be equal to states!"
 
-    eq_idx = [findfirst(x->s ∈ Set(ModelingToolkit.vars(x.lhs)), eqs) for s in states]
+    eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->s ∈ Set(ModelingToolkit.vars(x.lhs)), eqs) for s in states]
 
     unused_idx = reverse(setdiff(1:length(eqs), eq_idx))
     for i in 1:length(eq_idx)
