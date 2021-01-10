@@ -48,6 +48,10 @@ function connect_system(ios::IOSystem; verbose=false)
     verbose && @info "w/o superflous states" reduced_eqs1
 
     # reduce algebraic states of the system
+    # TODO tis should not work?
+    # ol = IOSystem([D(x) ~ a * x + b * u,
+    #                y ~ c * x + d*u]; inputs = [u], outputs = [y])
+    # TODO maximal acylic induced subgraph that is a tree?
     reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
     verbose && @info "with reduced algebraic states" reduced_eqs2
 
@@ -68,6 +72,7 @@ function connect_system(ios::IOSystem; verbose=false)
     end
 end
 
+# TODO: documentation
 function reduce_superflous_states(eqs::Vector{Equation}, outputs)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs) # will be used for the dependency graph
@@ -95,6 +100,7 @@ function reduce_superflous_states(eqs::Vector{Equation}, outputs)
     end
 end
 
+# TODO: documentation
 function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs) # will be used for the dependency graph

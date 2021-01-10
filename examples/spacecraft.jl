@@ -229,3 +229,57 @@ prob = ODEProblem(odefun, u0, tspan, p)
 sol = solve(prob, dtmax=0.1)
 plot(t->sol(t)[1],tspan..., label="altitude", title="better control")
 plot!(t->targetfun(t),tspan..., label="target")
+
+#=
+TODO Setup PI Controller!
+PI Controller
+```
+             *-----------------------------------------------*
+             | pi_c                                   *---*  |
+             |                           *------------|   |  |
+             |        *----*  *--------* | *-------*  |sum|--|--o(t)
+  target(t)--|--p(t)--|diff|--| prop K |-*-| int T |--|   |  |
+feedback(t)--|--m(t)--|    |  *--------*   *-------*  *---*  |
+             |        *----*                                 |
+             *-----------------------------------------------*
+```
+=#
+# @parameters T a1(t) a2(t)
+# @variables sum(t) altitude(t)
+# int = IOBlock([D(o) ~ 1/T * i], [i], [o], name=:int)
+# adder = IOBlock([sum ~ a1 + a2], [a1, a2], [sum], name=:add)
+
+# pi_c = IOSystem([prop.i => diff.Δ,
+#                  int.i => prop.o,
+#                  adder.a1 => prop.o,
+#                  adder.a2 => int.o],
+#                 [diff, prop, int, adder],
+#                 outputs_map = [adder.sum => o],
+#                 inputs_map = [diff.p => target, diff.m => feedback],
+#                 name=:pi_c)
+# nothing # hide
+
+# # as before we can close the loop and build the control circuit
+
+# space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft.x],
+#                             [pi_c, spacecraft],
+#                             outputs_map = [spacecraft.x => altitude])
+# space_controller = connect_system(space_controller, verbose=true)
+# @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
+
+
+# # and we can simulate and plot the system
+# gen = generate_io_function(space_controller, first_states=[altitude])
+# gen.states
+
+# odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+# p = [100000, 0.1, 1.0] # T, K, m
+# u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
+# tspan = (0.0, 1000.0)
+# prob = ODEProblem(odefun, u0, tspan, p)
+# sol = solve(prob, dtmax=0.1)
+# plot(t->sol(t)[1],tspan..., label="altitude", title="pi control")
+# plot!(t->sol(t)[2],tspan..., label="int")
+# # plot(sol)
+# plot!(t->targetfun(t),tspan..., label="target")
+# plot!(yrange=(-0.5,2))

@@ -52,6 +52,7 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
     mass_matrix = generate_massmatrix(eqs)
 
     # substitute x(t) by x for all terms
+    # TODO: no primes!
     states′ = makesym.(states, states=[])
     inputs′ = makesym.(inputs, states=[])
     params′ = makesym.(params, states=[])
