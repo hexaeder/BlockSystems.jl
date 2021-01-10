@@ -21,7 +21,7 @@ Returns an named tuple with the fields
 - `params` symbols of parameters (in order)
 
 """
-function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false})
+function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false}, verbose=false)
     if ios isa IOSystem
         ios = connect_system(ios)
     end
@@ -39,10 +39,12 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
     # equations of form o = f(...) have to be transfomed to 0 = f(...) - o
 
     eqs = transform_algebraic_equations(ios.system.eqs)
+    verbose && @info "Transfomed algebraic eqs" eqs
 
     # simplify equations if wanted
     if simplify
         eqs = ModelingToolkit.simplify.(eqs)
+        verbose && @info "Simplified eqs" eqs
     end
 
     # reorder the equations to get du in the right order
@@ -50,22 +52,22 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
 
     # create massmatrix, we don't use the method provided by ODESystem because of reordering
     mass_matrix = generate_massmatrix(eqs)
+    verbose && @info "Reordered by states an generated mass matrix" eqs states massmatrix
 
     # substitute x(t) by x for all terms
-    # TODO: no primes!
-    states′ = makesym.(states, states=[])
-    inputs′ = makesym.(inputs, states=[])
-    params′ = makesym.(params, states=[])
+    state_syms = makesym.(states, states=[])
+    input_syms = makesym.(inputs, states=[])
+    param_syms = makesym.(params, states=[])
 
-    sub = merge(Dict(states .=> states′),
-                Dict(inputs .=> inputs′),
-                Dict(params .=> params′))
+    sub = merge(Dict(states .=> state_syms),
+                Dict(inputs .=> input_syms),
+                Dict(params .=> param_syms))
     formulas = [substitute(eq.rhs, sub) for eq in eqs]
 
     # generate functions
-    f_oop, f_ip = build_function(formulas, states′, inputs′, params′, ios.system.iv; expression = expression)
+    f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
 
-    return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=states′, inputs=inputs′, params=params′)
+    return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=state_syms, inputs=input_syms, params=param_syms)
 end
 
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
