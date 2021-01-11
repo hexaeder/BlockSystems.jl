@@ -231,8 +231,7 @@ plot(sol, vars=(0,1), label="altitude", title="better control")
 plot!(t->targetfun(t),tspan..., label="target")
 
 #=
-## Defining an PI controller
-TODO: Fix example
+## Defining an PT1 controller
 ```
              *-----------------------------------------------*
              | pi_c                                   *---*  |
@@ -247,7 +246,7 @@ feedback(t)--|--m(t)--|    |  *--------*   *-------*  *---*  |
 
 @parameters T a1(t) a2(t)
 @variables Σ(t) altitude(t)
-int = IOBlock([D(o) ~ 1/T * i], [i], [o], name=:int)
+int = IOBlock([D(o) ~ 1/T * i - o], [i], [o], name=:int)
 adder = IOBlock([Σ ~ a1 + a2], [a1, a2], [Σ], name=:add)
 
 pi_c = IOSystem([prop.i => diff.Δ,
@@ -268,12 +267,11 @@ space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft
 space_controller = connect_system(space_controller, verbose=false)
 @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
 
-
 # and we can simulate and plot the system
 gen = generate_io_function(space_controller, first_states=[altitude])
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
-p = [-10, 0.5, 1.0] # T, K, m
+p = [0.5, -1.5, 1.0] # K, T, m
 u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
 tspan = (0.0, 50.0)
 prob = ODEProblem(odefun, u0, tspan, p)
@@ -281,4 +279,4 @@ sol = solve(prob)
 plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PI controller")
 plot!(t->targetfun(t),tspan..., label="target")
 
-# 💥💥😱😭
+# thank you for flying with us :)

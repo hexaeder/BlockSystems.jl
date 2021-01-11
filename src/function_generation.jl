@@ -22,6 +22,7 @@ Returns an named tuple with the fields
 
 """
 function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false}, verbose=false)
+    # TODO: add first_parameters !
     if ios isa IOSystem
         ios = connect_system(ios)
     end
@@ -69,6 +70,8 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
 
     return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=state_syms, inputs=input_syms, params=param_syms)
 end
+
+# TODO generate_static_io_function
 
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
