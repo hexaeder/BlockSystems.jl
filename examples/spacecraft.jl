@@ -269,6 +269,7 @@ space_controller = connect_system(space_controller, verbose=false)
 
 # and we can simulate and plot the system
 gen = generate_io_function(space_controller, first_states=[altitude])
+@info "order of parameters" gen.params
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
 p = [0.5, -1.5, 1.0] # K, T, m
@@ -280,3 +281,4 @@ plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PI controlle
 plot!(t->targetfun(t),tspan..., label="target")
 
 # thank you for flying with us :)
+# TODO: FIX ordering of parameters, the results change from doc build to doc build
