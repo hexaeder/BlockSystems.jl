@@ -91,4 +91,31 @@ using LinearAlgebra
         iof = generate_io_function(iob, first_states=[iob.y])
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
     end
+
+    @testset "parameter ordering" begin
+        using ModelingToolkit: makesym
+
+        @parameters t a b i1(t) i2(t)
+        @variables o1(t) o2(t)
+        @derivatives D'~t
+
+        iob = IOBlock([D(o1)~a*i1 + b, D(o2)~o1+i2], [i1, i2], [o1, o2])
+
+        allequal(v1, v2) = all([isequal(e1, e2) for (e1, e2) ∈ zip(v1, v2)])
+
+        gen = generate_io_function(iob, first_states=[o1, o2])
+        @test allequal(gen.states, makesym.([o1, o2], states=[]))
+        gen = generate_io_function(iob, first_states=[o2, o1])
+        @test allequal(gen.states, makesym.([o2, o1], states=[]))
+
+        gen = generate_io_function(iob, first_inputs=[i1, i2])
+        @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
+        gen = generate_io_function(iob, first_inputs=[i2, i1])
+        @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
+
+        gen = generate_io_function(iob, first_params=[a, b])
+        @test allequal(gen.params, makesym.([a, b], states=[]))
+        gen = generate_io_function(iob, first_params=[b, a])
+        @test allequal(gen.params, makesym.([b, a], states=[]))
+    end
 end

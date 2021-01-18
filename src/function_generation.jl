@@ -3,44 +3,54 @@ export generate_io_function
 """
 $(SIGNATURES)
 
-Generate calleble functions for an `AbstractIOSystem`. An `IOSystem` will be transformed to an `IOBlock` first.
+Generate callable functions for an `AbstractIOSystem`. An `IOSystem` will be transformed to an `IOBlock` first.
 
 Parameters:
 - `ios`: the system to build the function
-- `first_states`: define states=(istates ∪ outputs) which shoud appar first
-- `first_inputs`: define inputs which shoud appar first
+- `first_states`: define states=(istates ∪ outputs) which should appear first
+- `first_inputs`: define inputs which should appear first
+- `first_params`: define parameters which should appear first
 - `simplify=true`: call simplify on the equations before building?
 - `expression=Val{false}`: toggle expression and callable function output
 
 Returns an named tuple with the fields
 - `f_ip` in-place function `f(dstates, states, inputs, params, iv)`
-- `f_oop` out-of-place function `f(states, inputs, params, iv)=>dstates`
+- `f_oop` out-of-place function `f(states, inputs, params, iv) => dstates`
 - `massm` mass matrix of the system
 - `states` symbols of states (in order)
 - `inputs` symbols of inputs (in order)
 - `params` symbols of parameters (in order)
 
 """
-function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [], simplify=true, expression = Val{false}, verbose=false)
-    # TODO: add first_parameters !
+function generate_io_function(ios::AbstractIOSystem;
+                              first_states = [], first_inputs = [], first_params = [],
+                              simplify=true, expression = Val{false}, verbose=false)
     if ios isa IOSystem
         ios = connect_system(ios)
     end
-    # first_outputs and first_inputs may be given in namepsace version
+    # first_outputs, first_inputs and first_params may be given in namepsace version
     first_states = remove_namespace.(ios.name, value.(first_states))
     first_inputs = remove_namespace.(ios.name, value.(first_inputs))
+    first_params = remove_namespace.(ios.name, value.(first_params))
+
     Set(first_states) ⊆ (Set(ios.outputs) ∪ Set(ios.istates)) || throw(ArgumentError("first_states !⊆ (outputs ∪ istates)"))
     Set(first_inputs) ⊆ Set(ios.inputs) || throw(ArgumentError("first_inputs !⊆ inputs"))
+    Set(first_params) ⊆ Set(ios.iparams) || throw(ArgumentError("first_params !⊆ iparams"))
 
-    # enforce ordering of states and inputs
+    # enforce ordering of states, inputs and params
     states = vcat(first_states, ios.outputs, ios.istates) |> unique
     inputs = vcat(first_inputs, ios.inputs) |> unique
-    params = ios.iparams
+    params = vcat(first_params, ios.iparams) |> unique
 
-    # equations of form o = f(...) have to be transfomed to 0 = f(...) - o
+    # warning
+    if length(first_states) != length(states) || length(first_inputs) != length(inputs) || length(first_params) != length(params)
+        @warn "The ordering of the states/inputs/params might change from run to run. Therefore it is highly recommend to provide all variables in the first_* arguments" states inputs params
+    end
+
+    # equations of form o = f(...) have to be transformed to 0 = f(...) - o
 
     eqs = transform_algebraic_equations(ios.system.eqs)
-    verbose && @info "Transfomed algebraic eqs" eqs
+    verbose && @info "Transformed algebraic eqs" eqs
 
     # simplify equations if wanted
     if simplify
@@ -96,7 +106,7 @@ function reorder_by_states(eqs::AbstractVector{Equation}, states)
             eq_idx[i] = pop!(unused_idx)
         end
     end
-    @assert sort(unique(eq_idx)) == 1:length(eqs) "eq_idx shoud contain all idx!"
+    @assert sort(unique(eq_idx)) == 1:length(eqs) "eq_idx should contain all idx!"
     return eqs[eq_idx]
 end
 
