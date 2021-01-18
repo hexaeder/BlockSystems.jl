@@ -7,11 +7,14 @@ using DifferentialEquations
 using ModelingToolkit
 
 # generate examples
-spacecraft = joinpath(@__DIR__, "..", "examples", "spacecraft.jl")
-kuramoto = joinpath(@__DIR__, "..", "examples", "kuramoto_network.jl")
+examples = [
+    joinpath(@__DIR__, "..", "examples", "spacecraft.jl"),
+    joinpath(@__DIR__, "..", "examples", "kuramoto_network.jl"),
+    joinpath(@__DIR__, "..", "examples", "kuramoto_without_nd.jl"),
+]
 OUTPUT = joinpath(@__DIR__, "src/generated")
 
-for ex in [spacecraft, kuramoto]
+for ex in examples
     Literate.markdown(ex, OUTPUT)
 end
 
@@ -28,7 +31,8 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Examples" => ["Spacecraft" => "generated/spacecraft.md",
-                       "Kuramoto Network" => "generated/kuramoto_network.md"]
+                       "Kuramoto Network" => "generated/kuramoto_network.md",
+                       "Kuramoto without ND.jl" => "generated/kuramoto_without_nd.md"]
     ],
 )
 
