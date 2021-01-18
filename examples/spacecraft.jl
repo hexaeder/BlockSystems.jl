@@ -277,7 +277,7 @@ u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
 tspan = (0.0, 50.0)
 prob = ODEProblem(odefun, u0, tspan, p)
 sol = solve(prob)
-plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PI controller")
+plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PT1 controller")
 plot!(t->targetfun(t),tspan..., label="target")
 
 # thank you for flying with us :)
