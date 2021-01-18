@@ -159,7 +159,7 @@ The functions have the form
 where `u` are all the states (outputs stacked on top of internal states) and `t` is the independent variable of the system.
 The order of the inputs and states can be controlled.
 =#
-gen = generate_io_function(space_controller, first_states=[altitude])
+gen = generate_io_function(space_controller, first_states=[altitude, v], first_params=[K, M])
 @info "Generated function" gen.massm gen.states gen.inputs gen.params
 nothing # hide
 
@@ -219,7 +219,7 @@ space_controller = IOSystem([prop_v.i => spacecraft.v,
                             outputs_map = [spacecraft.x => altitude])
 
 space_controller = connect_system(space_controller)
-gen = generate_io_function(space_controller, first_states=[altitude])
+gen = generate_io_function(space_controller, first_states=[altitude, v], first_params=[prop_c.K, M, prop_v.K])
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
 p = [1.0, 1.0, 0.5] # propc, M, propv
@@ -268,7 +268,7 @@ space_controller = connect_system(space_controller, verbose=false)
 @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
 
 # and we can simulate and plot the system
-gen = generate_io_function(space_controller, first_states=[altitude])
+gen = generate_io_function(space_controller, first_states=[altitude], first_params=[K, T, M])
 @info "order of parameters" gen.params
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
@@ -281,4 +281,3 @@ plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PI controlle
 plot!(t->targetfun(t),tspan..., label="target")
 
 # thank you for flying with us :)
-# TODO: FIX ordering of parameters, the results change from doc build to doc build
