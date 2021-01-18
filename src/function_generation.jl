@@ -4,9 +4,13 @@ export generate_io_function
 $(SIGNATURES)
 
 Generate callable functions for an `AbstractIOSystem`. An `IOSystem` will be transformed to an `IOBlock` first.
+At this level there is no more distinction between internal states and outputs:
+`states=(istates ∪ outputs)`.
 
 Parameters:
 - `ios`: the system to build the function
+optional:
+- `type=:auto`: `:ode` or `:static`, determines the output of the function
 - `first_states`: define states=(istates ∪ outputs) which should appear first
 - `first_inputs`: define inputs which should appear first
 - `first_params`: define parameters which should appear first
@@ -14,19 +18,25 @@ Parameters:
 - `expression=Val{false}`: toggle expression and callable function output
 
 Returns an named tuple with the fields
-- `f_ip` in-place function `f(dstates, states, inputs, params, iv)`
-- `f_oop` out-of-place function `f(states, inputs, params, iv) => dstates`
-- `massm` mass matrix of the system
+- for `type=:ode`:
+  - `f_ip` in-place function `f(dstates, states, inputs, params, iv)`
+  - `f_oop` out-of-place function `f(states, inputs, params, iv) => dstates`
+  - `massm` mass matrix of the system
+- for `type=:static`:
+  - `f_ip` in-place function `f(states, inputs, params, iv)`
+  - `f_oop` out-of-place function `f(inputs, params, iv) => states`
+- always:
 - `states` symbols of states (in order)
 - `inputs` symbols of inputs (in order)
 - `params` symbols of parameters (in order)
 
 """
-function generate_io_function(ios::AbstractIOSystem;
+function generate_io_function(ios::AbstractIOSystem; type=:auto,
                               first_states = [], first_inputs = [], first_params = [],
                               simplify=true, expression = Val{false}, verbose=false)
     if ios isa IOSystem
-        ios = connect_system(ios)
+        @info "Transform given System to Block"
+        ios = connect_system(ios, verbose=verbose)
     end
     # first_outputs, first_inputs and first_params may be given in namepsace version
     first_states = remove_namespace.(ios.name, value.(first_states))
@@ -47,23 +57,35 @@ function generate_io_function(ios::AbstractIOSystem;
         @warn "The ordering of the states/inputs/params might change from run to run. Therefore it is highly recommend to provide all variables in the first_* arguments" states inputs params
     end
 
-    # equations of form o = f(...) have to be transformed to 0 = f(...) - o
+    # reorder the equations to get du in the right order
+    eqs = reorder_by_states(ios.system.eqs, states)
+    verbose && @info "Reordered eqs" eqs states
 
-    eqs = transform_algebraic_equations(ios.system.eqs)
-    verbose && @info "Transformed algebraic eqs" eqs
+    if type == :auto
+        type = all_static(eqs) ? :static : :ode
+        verbose && @info "auto-equation type: $type"
+    end
+
+    local mass_matrix
+    if type == :ode
+        # equations of form o = f(...) have to be transformed to 0 = f(...) - o
+        eqs = transform_algebraic_equations(eqs)
+        verbose && @info "Transformed algebraic eqs" eqs
+
+        # create massmatrix, we don't use the method provided by ODESystem because of reordering
+        mass_matrix = generate_massmatrix(eqs)
+        verbose && @info "Reordered by states and generated mass matrix" mass_matrix
+    elseif type == :static
+        all_static(eqs) || throw(ArgumentError("Equations of system are not static!"))
+    else
+        throw(ArgumentError("Unknown type $type"))
+    end
 
     # simplify equations if wanted
     if simplify
         eqs = ModelingToolkit.simplify.(eqs)
         verbose && @info "Simplified eqs" eqs
     end
-
-    # reorder the equations to get du in the right order
-    eqs = reorder_by_states(eqs, states)
-
-    # create massmatrix, we don't use the method provided by ODESystem because of reordering
-    mass_matrix = generate_massmatrix(eqs)
-    verbose && @info "Reordered by states and generated mass matrix" eqs states mass_matrix
 
     # substitute x(t) by x for all terms
     state_syms = makesym.(states, states=[])
@@ -76,12 +98,14 @@ function generate_io_function(ios::AbstractIOSystem;
     formulas = [substitute(eq.rhs, sub) for eq in eqs]
 
     # generate functions
-    f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
-
-    return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=state_syms, inputs=input_syms, params=param_syms)
+    if type == :ode
+        f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
+        return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=state_syms, inputs=input_syms, params=param_syms)
+    elseif type == :static
+        f_oop, f_ip = build_function(formulas, input_syms, param_syms, ios.system.iv; expression = expression)
+        return (f_oop=f_oop, f_ip=f_ip, states=state_syms, inputs=input_syms, params=param_syms)
+    end
 end
-
-# TODO generate_static_io_function
 
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
@@ -123,4 +147,14 @@ function generate_massmatrix(eqs::AbstractVector{Equation})
     end
     M = Diagonal(V)
     return M==I ? I : M
+end
+
+function all_static(eqs::AbstractVector{Equation})
+    # TODO: all_static should check for cross dependencies (o1 = a, o2 = o1 + i1)
+    for i in 1:length(eqs)
+        if eqs[i].lhs isa Term && eqs[i].lhs.op isa Differential
+            return false
+        end
+    end
+    return true
 end

@@ -69,7 +69,23 @@ using LinearAlgebra
         @test generate_massmatrix(eqs) == I
     end
 
-    @testset "function generation" begin
+    @testset "all_static" begin
+        using IOSystems: all_static
+        @parameters t a b i1(t) i2(t)
+        @variables o1(t) o2(t)
+        @derivatives D'~t
+        eqs = [o1 ~ a*i1 + i2,
+               o2 ~ b*i1 + i2]
+        @test all_static(eqs)
+        eqs = [D(o1) ~ a*i1 + i2,
+               o2 ~ b*i1 + i2]
+        @test !all_static(eqs)
+        eqs = [o1 ~ a*i1 + i2 + o2,
+               o2 ~ b*i1 + i2]
+        @test_broken !all_static(eqs)
+    end
+
+    @testset "ode function generation" begin
         @parameters t a i(t)
         @variables x(t) y(t)
         @derivatives D'~t
@@ -90,6 +106,24 @@ using LinearAlgebra
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
         iof = generate_io_function(iob, first_states=[iob.y])
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
+    end
+
+    @testset "ode function generation" begin
+        @parameters t a i1(t) i2(t)
+        @variables x(t) y(t)
+        @derivatives D'~t
+        iob = IOBlock([x~a*i1, y~i2], [i1, i2], [x, y])
+
+        iof = generate_io_function(iob);
+
+        @test isequal(iof.inputs, Sym{Real}.([:i1, :i2]))
+        @test isequal(iof.states, Sym{Real}.([:x, :y]))
+        @test isequal(iof.params, [Sym{Real}(:a)])
+
+        @test iof.f_oop([4, 1], [-1], 0) == [-4, 1]
+        a = Vector{Float64}(undef, 2)
+        iof.f_ip(a, [-1,1], [-1], 0)
+        @test a == [1, 1]
     end
 
     @testset "parameter ordering" begin
