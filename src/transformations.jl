@@ -7,7 +7,7 @@ Recursively transform `IOSystems` to `IOBlocks`.
 
 - substitute inputs with connected outputs
 - try to eliminate equations for internal states which are not used to calculate the specified outputs of the system.
-- try to eliminate explicit algebraic equations (i.e. outputs of internal blocks) by substituting each occurence
+- try to eliminate explicit algebraic equations (i.e. outputs of internal blocks) by substituting each occurrence
   with their rhs. Explicit algebraic states which are marked as system outputs won't be reduced.
 
 Parameters:
@@ -23,7 +23,7 @@ function connect_system(ios::IOSystem; verbose=false)
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
 
-    verbose && @info "Transfom IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs ios.connections eqs
+    verbose && @info "Transform IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs ios.connections eqs
 
     # get rid of closed inputs by substituting output states
     connections = ios.connections
@@ -33,12 +33,11 @@ function connect_system(ios::IOSystem; verbose=false)
 
     verbose && @info "subsitute inputs with outputs" eqs
 
-
-    # TODO: check assumtions
+    # TODO: check assumption
     # - each state is represented by one lhs
     # - lhs only first order or algebraic
-    # - no self loop in algeraic (not needed?)
-    # - check that every variable found in the equations is referenced by namespacemap
+    # - no self loop in algebraic (not needed?)
+    # - check that every variable found in the equations is referenced by namespace map
     # - dependency graph does not work correctly for implicit algebraic states! forbid them
     #   -> does this have implications for the reduction of depended explicit a states?
 
