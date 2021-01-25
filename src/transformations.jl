@@ -47,7 +47,6 @@ function connect_system(ios::IOSystem; verbose=false)
     verbose && @info "w/o superflous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    # TODO maximal acylic induced subgraph that is a tree?
     reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
     verbose && @info "with reduced algebraic states" reduced_eqs2
 
@@ -69,7 +68,16 @@ function connect_system(ios::IOSystem; verbose=false)
     end
 end
 
-# TODO: documentation
+"""
+    reduce_superflous_states(eqs::Vector{Equation}, outputs)
+
+This function reduce equations which are not used in order to generate the given
+`outputs`. It recoursively looks for attractic components in the dependency graph which
+are not connected to the output nodes.
+Returns a new set of equations without these states.
+
+TODO: Change strategy, remove i if there is no path from i to outputs.
+"""
 function reduce_superflous_states(eqs::Vector{Equation}, outputs)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs) # will be used for the dependency graph
@@ -97,23 +105,53 @@ function reduce_superflous_states(eqs::Vector{Equation}, outputs)
     end
 end
 
-# TODO: documentation
+"""
+    reduce_algebraic_states(eqs:Vector{Equation}, skip=[])
+
+Reduces the number of equations by substituting explicit algebraic equations.
+Returns a new set of equations.
+
+The optional skip argument is used to declare states which should not be reduced.
+
+This function checks for cyclic dependencies between algebraic equations by generating
+a dependency graph between them. All substitutions have to be pairwise cycle free.
+```example
+julia> @variables i x y o1 o2;
+julia> @derivatives D'~t;
+julia> eqs = [D(x) ~ i,
+              o1 ~ x + o2,
+              D(y) ~ i,
+              o2 ~ y + o1];
+julia> reduce_algebraic_states(eqs)
+3-element Array{Equation,1}:
+ Equation(Differential(x), i)
+ Equation(o1, x + (y + o1))
+ Equation(Differential(y), i)
+```
+"""
 function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
     neweqs = deepcopy(eqs)
-    sys = ODESystem(neweqs) # will be used for the dependency graph
-    neweqs = sys.eqs # the ODESystem might reorder the equations
 
     # only consider states for reduction which are explicit algebraic and not in skip
     condition = eq -> is_explicit_algebraic(eq) && !(Set(get_variables(eq.lhs)) ⊆ Set(skip))
     algebraic_idx = findall(condition, neweqs)
 
-    # generate dependency graph
-    graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
+    # symbols of all algebraic eqs
+    symbols = [eq.lhs for eq ∈ neweqs[algebraic_idx]]
 
-    # algebraic states which do no have cyclic dependencies between them can be reduced
-    cycles = simplecycles(graph)
-    reducable = pairwise_cycle_free(algebraic_idx, cycles)
-    rules = [eq.lhs => eq.rhs for eq in neweqs[reducable]]
+    # generate dependency graph
+    g = SimpleDiGraph(length(algebraic_idx))
+    for (i, eq) in enumerate(neweqs[algebraic_idx])
+        rhs_vars = vars(eq.rhs)
+        for (isym, sym) in enumerate(symbols)
+            if Set([sym]) ⊆ Set(rhs_vars)
+                add_edge!(g, isym => i)
+            end
+        end
+    end
+    reducable = algebraic_idx[pairwise_cycle_free(g)]
+
+    rules = Dict(eq.lhs => eq.rhs for eq in neweqs[reducable])
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(neweqs)
         neweqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
@@ -121,26 +159,36 @@ function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
     @assert isunique(reducable)
     deleteat!(neweqs, sort(reducable))
 
-    # reduction has to be repeated recursively
-    if neweqs == eqs
-        return neweqs
-    else
-        return reduce_algebraic_states(neweqs, skip=skip)
-    end
+    return neweqs
 end
 
-function pairwise_cycle_free(idx, cycles)
-    pairs = collect(Iterators.product(idx, idx))
-    # check for each pair whether found in cycle
-    incycle(p) = p[1]==p[2] ? false : any(map(c -> p ⊆ c, cycles))
-    A = incycle.(pairs)
-    if !any(A)
-        return idx
-    else
-        # find the variable with the highes number of loops
-        cycle_count = reduce(+, A, dims=1)[:]
-        worst_idx = findmax(cycle_count)[2]
-        deleteat!(idx, worst_idx)
-        return pairwise_cycle_free(idx, cycles)
+"""
+    pairwise_cycle_free(g:SimpleDiGraph)
+
+Returns an array of vertices, which pairwise do not belong to any cycle in `g`.
+Uses `simplecycles` from `LightGraphs`. The algorithm starts with all vertices
+and iteratively removes the vertices is part of most cycles.
+"""
+function pairwise_cycle_free(g::SimpleDiGraph)
+    idx = collect(vertices(g))
+    cycles = simplecycles(g)
+    while true
+        cycles_per_idx = zeros(Int, length(idx))
+        for (i, id1) ∈ enumerate(idx)
+            for (j, id2) ∈ enumerate(@view idx[i+1 : end])
+                for c in cycles
+                    if id1 ∈ c && id2 ∈ c
+                        cycles_per_idx[i] += 1
+                        cycles_per_idx[i+j] += 1
+                    end
+                end
+            end
+        end
+        if sum(cycles_per_idx) > 0
+            worst_idx = findmax(cycles_per_idx)[2]
+            deleteat!(idx, worst_idx)
+        else
+            return idx
+        end
     end
 end
