@@ -75,6 +75,10 @@ p = (ω, K); # p[1] vertex parameters, p[2] edge parameters
 
 x0 = collect(1:N)./N
 x0 .-= sum(x0)./N
+
+#src using BenchmarkTools
+#src @btime $nd($x0, $x0, $p, 0.0)
+
 tspan = (0., 10.)
 prob = ODEProblem(nd, x0, tspan, p)
 sol = solve(prob)

@@ -4,7 +4,7 @@ using LinearAlgebra
 using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
-using ModelingToolkit: rename, getname, renamespace, namespace_equations, value, makesym
+using ModelingToolkit: rename, getname, renamespace, namespace_equations, value, makesym, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using SymbolicUtils: Symbolic, to_symbolic
 using LightGraphs
@@ -273,6 +273,11 @@ remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") =
 remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
 remove_namespace(x::Term) = rename(x, remove_namespace(x.op.name))
 
+"""
+    is_explicit_algebraic(eq::Equation)
+
+True if lhs is a single symbol x and x ∉ rhs!
+"""
 function is_explicit_algebraic(eq::Equation)
     if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
         vars = get_variables(eq.lhs)

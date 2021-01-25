@@ -122,6 +122,9 @@ x0 = collect(1:N)./N
 x0 .-= sum(x0)./N
 nothing #hide
 
+#src using BenchmarkTools
+#src @btime $odefun($x0, $x0, $p, 0.0)
+
 # ... and solve the system!
 tspan = (0., 10.)
 prob = ODEProblem(odefun, x0, tspan, p)

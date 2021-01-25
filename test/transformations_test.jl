@@ -17,7 +17,7 @@ using LightGraphs
         add_edge!(g, 2=>3)
         add_edge!(g, 5=>4)
         cycles = simplecycles(g)
-        @test pairwise_cycle_free([1,2,3,4,5], cycles) == [3,5]
+        @test pairwise_cycle_free(g) == [3,5]
     end
 
     @testset "reduce superflous states" begin
@@ -77,9 +77,9 @@ using LightGraphs
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs)
-        @test reqs == [D(x) ~ i,
-                       D(y) ~ i,
-                       o1 ~ x + (y + o1)]
+        @test Set(reqs) == Set([D(x) ~ i,
+                                D(y) ~ i,
+                                o1 ~ x + (y + o1)])
 
         @test reduce_algebraic_states(reqs) == reqs
 
@@ -94,9 +94,9 @@ using LightGraphs
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs, skip=[o1])
-        @test reqs == [D(x) ~ i,
-                       D(y) ~ i,
-                       o1 ~ x + (y + o1)]
+        @test Set(reqs) == Set([D(x) ~ i,
+                                D(y) ~ i,
+                                o1 ~ x + (y + o1)])
 
         reqs = reduce_algebraic_states(eqs, skip=[o2])
         @test reqs == [D(x) ~ i,
