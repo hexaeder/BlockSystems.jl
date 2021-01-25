@@ -301,4 +301,15 @@ using LightGraphs
         @test isequal(remove_namespace(bn), b)
         @test isequal(remove_namespace(b), b)
     end
+
+    @testset "check macro" begin
+        using IOSystems: check
+        @variables a b c d
+        @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+        try
+            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+        catch e
+            @test e isa ArgumentError
+        end
+    end
 end

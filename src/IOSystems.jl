@@ -291,6 +291,23 @@ end
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
+"""
+   @check cond msg
+
+If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
+TODO: Proper Output
+"""
+macro check(cond::Expr, msg)
+    variables = ()
+    for a in cond.args[2:end]
+        if a isa Expr || a isa Symbol
+            variables = (esc(a), variables...)
+        end
+    end
+    print = :(@show($(repr(cond)),$(variables...)))
+    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
+end
+
 include("transformations.jl")
 include("function_generation.jl")
 
