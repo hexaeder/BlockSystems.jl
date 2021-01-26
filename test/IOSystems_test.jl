@@ -35,8 +35,8 @@ using LightGraphs
         @test Set(iob.istates) == Set([x1, x2])
         @test Set(iob.outputs) == Set([o1, o2])
 
-        @test_throws AssertionError IOBlock(eqs, [x1], [o1,o2])
-        @test_throws AssertionError IOBlock(eqs, [i1,i2], [i1,o1,o2])
+        @test_throws ArgumentError IOBlock(eqs, [x1], [o1,o2])
+        @test_throws ArgumentError IOBlock(eqs, [i1,i2], [i1,o1,o2])
     end
 
     @testset "test of create_namespace_promotions" begin
@@ -303,11 +303,10 @@ using LightGraphs
     end
 
     @testset "check macro" begin
-        using IOSystems: check
         @variables a b c d
-        @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+        IOSystems.@check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset"
         try
-            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+            IOSystems.@check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
         catch e
             @test e isa ArgumentError
         end

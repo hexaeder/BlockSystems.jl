@@ -12,6 +12,23 @@ using LightGraphs
 export AbstractIOSystem, IOBlock, IOSystem
 
 """
+   check(cond, msg)
+
+If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
+TODO: Proper Output
+"""
+macro check(cond::Expr, msg)
+    variables = ()
+    for a in cond.args[2:end]
+        if a isa Expr || a isa Symbol
+            variables = (esc(a), variables...)
+        end
+    end
+    print = :(@show($(repr(cond)),$(variables...)))
+    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
+end
+
+"""
 abstract supertype for [`IOBlock`](@ref) and [`IOSystem`](@ref).
 """
 abstract type AbstractIOSystem end
@@ -54,6 +71,18 @@ struct IOBlock <: AbstractIOSystem
     istates::Vector{Symbolic}
     outputs::Vector{Symbolic}
     system::ODESystem
+    reduced_equations::Vector{Equation}
+
+    function IOBlock(name, inputs, iparams, istates, outputs, os, reduced_equations)
+        @check Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters"
+        @check Set(outputs) ⊆ Set(states(os)) "outputs musst be variables"
+        @check Set(iparams) ⊆ Set(parameters(os)) "iparams musst be parameters"
+        @check Set(istates) ⊆ Set(states(os)) "istates musst be variables"
+        @check Set(inputs ∪ iparams) == Set(parameters(os)) "inputs ∪ iparams != params"
+        @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
+
+        new(name, inputs, iparams, istates, outputs, os, reduced_equations)
+    end
 end
 
 """
@@ -73,20 +102,12 @@ iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
     os = ODESystem(eqs, name = name)
 
-    # TODO: check constraints to system of equations
-    # TODO: remove assertions in favour of errors
-    @assert Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters: $(Set(inputs)) !⊆ $(Set(parameters(os)))"
-    @assert Set(outputs) ⊆ Set(states(os)) "outputs musst be variables: $(Set(outputs)) !⊆ $(Set(states(os)))"
-
-    inputs = parameters(os) ∩ inputs # gets the inputs as `tern` type
-    outputs = os.states ∩ outputs # gets the outputs as `tern` type
+    inputs = value.(inputs) # gets the inputs as `tern` type
+    outputs = value.(outputs) # gets the outputs as `tern` type
     istates = setdiff(os.states, outputs)
     iparams = setdiff(parameters(os), inputs)
 
-    @assert Set(os.states) == Set(outputs ∪ istates)
-    @assert Set(parameters(os)) == Set(inputs ∪ iparams)
-
-    IOBlock(name, inputs, iparams, istates, outputs, os)
+    IOBlock(name, inputs, iparams, istates, outputs, os, Equation[])
 end
 
 function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
@@ -290,23 +311,6 @@ function is_explicit_algebraic(eq::Equation)
 end
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
-
-"""
-   @check cond msg
-
-If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
-TODO: Proper Output
-"""
-macro check(cond::Expr, msg)
-    variables = ()
-    for a in cond.args[2:end]
-        if a isa Expr || a isa Symbol
-            variables = (esc(a), variables...)
-        end
-    end
-    print = :(@show($(repr(cond)),$(variables...)))
-    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
-end
 
 include("transformations.jl")
 include("function_generation.jl")
