@@ -130,19 +130,19 @@ using LightGraphs
         iob2 = IOBlock([o~i],[i],[o],name=:name)
 
         # namespace collision
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2])
         iob2 = IOBlock([o~i],[i],[o])
         # mulitiple conneections to same input
-        @test_throws AssertionError IOSystem([iob1.i=>iob1.o, iob1.i=>iob2.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.i=>iob1.o, iob1.i=>iob2.o], [iob1, iob2])
         # make sure that alle of form input => output
-        @test_throws AssertionError IOSystem([iob1.o=>iob1.o], [iob1, iob2])
-        @test_throws AssertionError IOSystem([iob1.i=>iob1.i], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.o=>iob1.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.i=>iob1.i], [iob1, iob2])
 
         # assert that input maps refere to open inputs
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2], inputs_map = [iob2.i => i])
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2], inputs_map = [iob2.i => i])
         # assert that rhs of input map is unique
         iob3 = IOBlock([o~i],[i],[o])
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o],
                                              [iob1, iob2, iob3],
                                              inputs_map = [iob1.i => i, iob3.i => i])
 
@@ -154,21 +154,21 @@ using LightGraphs
         iob2 = IOBlock([D(x)~ i, o~a*x], [i], [o], name=:iob2)
         IOSystem([iob2.i=>iob1.o], [iob1, iob2])
         # rhs unique
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  iparams_map = [iob1.a=>b, iob2.a=>b])
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  istates_map = [iob1.x=>y, iob2.x=>y])
         # keys in right set
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  iparams_map = [iob1.x=>b])
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  istates_map = [iob1.a=>y])
 
         # tests for outputs
         # rhs unique
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  outputs_map = [iob1.o=>y, iob2.o=>y])
-        @test_throws AssertionError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                  outputs_map = [iob1.a=>y])
     end
 

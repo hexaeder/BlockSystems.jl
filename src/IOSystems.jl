@@ -6,7 +6,7 @@ using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
 using ModelingToolkit: rename, getname, renamespace, namespace_equations, value, makesym, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
-using SymbolicUtils: Symbolic, to_symbolic
+using SymbolicUtils: Symbolic
 using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem
@@ -74,10 +74,10 @@ struct IOBlock <: AbstractIOSystem
     reduced_equations::Vector{Equation}
 
     function IOBlock(name, inputs, iparams, istates, outputs, os, reduced_equations)
-        @check Set(inputs) ⊆ Set(parameters(os)) "inputs musst be parameters"
-        @check Set(outputs) ⊆ Set(states(os)) "outputs musst be variables"
-        @check Set(iparams) ⊆ Set(parameters(os)) "iparams musst be parameters"
-        @check Set(istates) ⊆ Set(states(os)) "istates musst be variables"
+        @check Set(inputs) ⊆ Set(parameters(os)) "inputs must be parameters"
+        @check Set(outputs) ⊆ Set(states(os)) "outputs must be variables"
+        @check Set(iparams) ⊆ Set(parameters(os)) "iparams must be parameters"
+        @check Set(istates) ⊆ Set(states(os)) "istates must be variables"
         @check Set(inputs ∪ iparams) == Set(parameters(os)) "inputs ∪ iparams != params"
         @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
 
@@ -88,6 +88,8 @@ struct IOBlock <: AbstractIOSystem
         new(name, inputs, iparams, istates, outputs, os, reduced_equations)
     end
 end
+
+independent_variable(block::IOBlock) = block.system.iv
 
 """
 $(SIGNATURES)
@@ -114,6 +116,11 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym
     IOBlock(name, inputs, iparams, istates, outputs, os, Equation[])
 end
 
+"""
+$(SIGNATURES)
+
+Construct a new IOBlock based on an existing. Deep-copy all fields and assigns new name.
+"""
 function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
     cp = deepcopy(iob)
     IOBlock(cp.system.eqs, cp.inputs, cp.outputs, name=name)
@@ -125,7 +132,7 @@ $(TYPEDEF)
 A composite `IOSystem` which consists of multiple [`AbstractIOSystem`](@ref) which are connected via
 a vector of namespaced pairs (`subsys1.out1 => subsys2.in1`).
 
-An `IOSystem` contains maps how to promote the namespaced variables of the subystem to the new scope
+An `IOSystem` contains maps how to promote the namespaced variables of the subsystem to the new scope
    subsys1₊x(t) => x(t)
    subsys1₊y(t) => subsys1₊y(t)
    subsys2₊y(t) => subsys2₊y(t)
@@ -145,6 +152,8 @@ struct IOSystem <: AbstractIOSystem
     outputs_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
+
+independent_variable(sys::IOSystem) = independent_variable(first(sys.systems))
 
 """
 $(SIGNATURES)
@@ -175,38 +184,34 @@ function IOSystem(cons,
                   autopromote = true
                   )
     namespaces = [sys.name for sys in io_systems]
-    @assert namespaces == unique(namespaces) "Namespace collision in subsystems!"
+    @check isunique(namespaces) "Namespace collision in subsystems!"
 
-    # TODO: assert the same iv
-    # TODO: check for collision in sub namespaces? is this even a problem?
+    ivs = unique([independent_variable(sys) for sys in io_systems])
+    @check length(ivs) == 1 "Multiple independent variables!"
 
-    @assert isunique(first.(cons)) "Multiple connections to same input!"
-    namespaced_inputs = vcat([namespace_inputs(sys)
-                              for sys in io_systems]...)
-    namespaced_iparams = vcat([namespace_iparams(sys)
-                               for sys in io_systems]...)
-    namespaced_istates = vcat([namespace_istates(sys)
-                               for sys in io_systems]...)
-    namespaced_outputs = vcat([namespace_outputs(sys)
-                               for sys in io_systems]...)
+    @check isunique(first.(cons)) "Multiple connections to same input!"
+    namespaced_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
+    namespaced_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
+    namespaced_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
+    namespaced_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
 
     # check validity of provided connections
-    @assert Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
-    @assert Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
+    @check Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
+    @check Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
     # reduce the inputs to the open inputs
     open_inputs = setdiff(namespaced_inputs, first.(cons))
 
     # check validity of provided namespace maps
     inputs_map = fix_map_types(inputs_map)
-    @assert keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
+    @check keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
     iparams_map = fix_map_types(iparams_map)
-    @assert keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
+    @check keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
     istates_map = fix_map_types(istates_map)
-    @assert keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
+    @check keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
     outputs_map = fix_map_types(outputs_map)
-    @assert keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
+    @check keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
     user_promotions = merge(inputs_map, iparams_map, istates_map, outputs_map)
-    @assert uniquenames(values(user_promotions)) "naming conflict in rhs of user provided namespace promotions"
+    @check uniquenames(values(user_promotions)) "naming conflict in rhs of user provided namespace promotions"
 
     # if the user provided a map of outputs, those outputs which are note referenced become states!
     if !isempty(outputs_map)
@@ -246,8 +251,8 @@ function IOSystem(cons,
     @assert uniquenames(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
     @assert uniquenames(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
     @assert uniquenames(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
-    @assert uniquenames(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespacepromotion not unique"
-    @assert uniquenames(vcat(collect.(values.([in_map, ip_map, is_map, out_map]))...)) "rhs of namespacepromotion not unique"
+    @assert uniquenames(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespace promotion not unique"
+    @assert uniquenames(vcat(collect.(values.([in_map, ip_map, is_map, out_map]))...)) "rhs of namespace promotion not unique"
 
     IOSystem(
         name,
@@ -267,20 +272,27 @@ end
 """
     fix_map_types(map)
 
-Creates Dict from map. Changes `Num`-types to `Symbolic`-types in the
-user provided maps. Map can be Dict or  Array of Pairs
+Creates Dict from `map`. Changes `Num`-types to `Symbolic`-types in the
+user provided maps. Map can be Dict or  Array of Pairs.
 """
 function fix_map_types(map)
     dict = Dict(map)
     newdict = Dict{Symbolic, Symbolic}()
     for k in keys(dict)
-        newkey = to_symbolic(k)
-        newdict[newkey] = to_symbolic(dict[k])
+        newkey = value(k)
+        newdict[newkey] = value(dict[k])
     end
     newdict
 end
 fix_map_types(::Nothing) = Dict()
 
+"""
+    create_namepsace_promotions(syms, forbidden)
+
+Takes two lists of Symbols, `syms` and `forbidden`. Returns a Dict of namespace
+promotions for each symbol in `syms`. Avoids name collisions inside the list as well
+as with the `forbidden` symbols.
+"""
 function create_namespace_promotions(syms, forbidden)
     promoted = remove_namespace.(syms)
     dict = Dict()
@@ -291,9 +303,25 @@ function create_namespace_promotions(syms, forbidden)
     return dict
 end
 
+
+"""
+    remove_namespace(namespace, x)
+
+If first namespace of `x` is `namespace` then remove it.
+```
+remove_namespace(A, A₊B₊x) -> B₊x
+remove_namespace(B, A₊B₊x) -> A₊B₊x
+````
+"""
 remove_namespace(namespace, name::T) where T = T(replace(String(name), Regex("^$(namespace)₊") => ""))
 remove_namespace(namespace, x::Sym) = rename(x, remove_namespace(namespace, x.name))
 remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, x.op.name))
+
+"""
+    remove_namespace(x)
+
+Strips `x` of its first namespace. `A₊B₊x -> B₊x`
+"""
 remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") => ""))
 remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
 remove_namespace(x::Term) = rename(x, remove_namespace(x.op.name))
