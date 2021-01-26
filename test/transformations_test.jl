@@ -3,6 +3,12 @@ using IOSystems
 using ModelingToolkit
 using LightGraphs
 
+# ordering and simplification should not matter for equity of equations!
+import Base.==
+function ==(A::Vector{Equation}, B::Vector{Equation})
+    Set(simplify.(A)) == Set(simplify.(B))
+end
+
 @info "Testes of transformations.jl"
 
 @testset "transformations.jl" begin
@@ -77,9 +83,9 @@ using LightGraphs
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs)
-        @test Set(reqs) == Set([D(x) ~ i,
-                                D(y) ~ i,
-                                o1 ~ x + (y + o1)])
+        @test reqs == [D(x) ~ i,
+                       D(y) ~ i,
+                       o1 ~ x + (y + o1)]
 
         @test reduce_algebraic_states(reqs) == reqs
 
@@ -94,9 +100,9 @@ using LightGraphs
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs, skip=[o1])
-        @test Set(reqs) == Set([D(x) ~ i,
-                                D(y) ~ i,
-                                o1 ~ x + (y + o1)])
+        @test reqs == [D(x) ~ i,
+                       D(y) ~ i,
+                       o1 ~ x + (y + o1)]
 
         reqs = reduce_algebraic_states(eqs, skip=[o2])
         @test reqs == [D(x) ~ i,
@@ -149,6 +155,6 @@ using LightGraphs
                D(B₊x1) ~ b * in3,
                D(B₊x2) ~ in4,
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
-        @test Set(eqs) == Set(iob.system.eqs)
+        @test eqs == iob.system.eqs
     end
 end
