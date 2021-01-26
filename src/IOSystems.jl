@@ -71,9 +71,9 @@ struct IOBlock <: AbstractIOSystem
     istates::Vector{Symbolic}
     outputs::Vector{Symbolic}
     system::ODESystem
-    reduced_equations::Vector{Equation}
+    removed_eqs::Vector{Equation}
 
-    function IOBlock(name, inputs, iparams, istates, outputs, os, reduced_equations)
+    function IOBlock(name, inputs, iparams, istates, outputs, os, removed_eqs)
         @check Set(inputs) ⊆ Set(parameters(os)) "inputs must be parameters"
         @check Set(outputs) ⊆ Set(states(os)) "outputs must be variables"
         @check Set(iparams) ⊆ Set(parameters(os)) "iparams must be parameters"
@@ -81,14 +81,14 @@ struct IOBlock <: AbstractIOSystem
         @check Set(inputs ∪ iparams) == Set(parameters(os)) "inputs ∪ iparams != params"
         @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
 
-        additional_vars = vars([eq.rhs for eq in reduced_equations])
+        additional_vars = vars([eq.rhs for eq in removed_eqs])
         all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams ∪ (os.iv, ))
-        @check additional_vars ⊆ all_vars "reduced eqs should not introduce new variables"
+        @check additional_vars ⊆ all_vars "removed eqs should not contain new variables"
 
         # TODO: check IOBlock assumptions in inner constructor
         # - each state is represented by one lhs (static or diff) or implicit algebraic equation?
         # - lhs only first order or algebraic
-        new(name, inputs, iparams, istates, outputs, os, reduced_equations)
+        new(name, inputs, iparams, istates, outputs, os, removed_eqs)
     end
 end
 
@@ -109,7 +109,7 @@ iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
 function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs;
-                 name = gensym(:IOBlock), reduced_eq = Equation[])
+                 name = gensym(:IOBlock), removed_eq = Equation[])
     os = ODESystem(eqs, name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -117,7 +117,7 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs;
     istates = setdiff(os.states, outputs)
     iparams = setdiff(parameters(os), inputs)
 
-    IOBlock(name, inputs, iparams, istates, outputs, os, reduced_eq)
+    IOBlock(name, inputs, iparams, istates, outputs, os, removed_eq)
 end
 
 """

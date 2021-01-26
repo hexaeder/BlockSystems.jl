@@ -8,7 +8,7 @@ Recursively transform `IOSystems` to `IOBlocks`.
 - substitute inputs with connected outputs
 - try to eliminate equations for internal states which are not used to calculate the specified outputs of the system.
 - try to eliminate explicit algebraic equations (i.e. outputs of internal blocks) by substituting each occurrence
-  with their rhs. Explicit algebraic states which are marked as system outputs won't be reduced.
+  with their rhs. Explicit algebraic states which are marked as system outputs won't be removed.
 
 Parameters:
 - `ios`: system to connect
@@ -32,15 +32,15 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
 
-    verbose && @info "subsitute inputs with outputs" eqs
+    verbose && @info "substitute inputs with outputs" eqs
 
     # get red of unused states
     # (internal variables which are not used for the outputs)
-    reduced_eqs1 = reduce_superflous_states(eqs, keys(ios.outputs_map))
-    verbose && @info "without superflous states" reduced_eqs1
+    reduced_eqs1 = remove_superfluous_states(eqs, keys(ios.outputs_map))
+    verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    (reduced_eqs2, expl_alg_eqs) = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
+    (reduced_eqs2, removed_eqs) = remove_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
     verbose && @info "without explicit algebraic states" reduced_eqs2
 
     # apply the namespace transformations
@@ -50,36 +50,36 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     for (i, eq) in enumerate(promoted_eqs)
         promoted_eqs[i] = eqsubstitute(eq, namespace_promotion)
     end
-    for (i, eq) in enumerate(expl_alg_eqs)
-        expl_alg_eqs[i] = eqsubstitute(eq, namespace_promotion)
+    for (i, eq) in enumerate(removed_eqs)
+        removed_eqs[i] = eqsubstitute(eq, namespace_promotion)
     end
-    verbose && @info "promoted namespaces" promoted_eqs expl_alg_eqs
+    verbose && @info "promoted namespaces" promoted_eqs removed_eqs
 
     if simplify_eqs
         promoted_eqs = simplify.(promoted_eqs)
-        expl_alg_eqs = simplify.(expl_alg_eqs)
-        verbose && @info "simplified" promoted_eqs expl_alg_eqs
+        removed_eqs = simplify.(removed_eqs)
+        verbose && @info "simplified equations" promoted_eqs removed_eqs
     end
 
     try
-        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name, reduced_eq = expl_alg_eqs)
+        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name, removed_eq=removed_eqs)
     catch e
-        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs expl_alg_eqs
+        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs removed_eqs
         throw(e)
     end
 end
 
 """
-    reduce_superflous_states(eqs::Vector{Equation}, outputs)
+    remove_superfluous_states(eqs::Vector{Equation}, outputs)
 
-This function reduce equations which are not used in order to generate the given
-`outputs`. It recoursively looks for attractic components in the dependency graph which
+This function removes equations, which are not used in order to generate the given
+`outputs`. It recursively looks for attracting components in the dependency graph which
 are not connected to the output nodes.
-Returns a new set of equations without these states.
+Returns a new, reduced set of equations without these states.
 
 TODO: Change strategy, remove i if there is no path from i to outputs.
 """
-function reduce_superflous_states(eqs::Vector{Equation}, outputs)
+function remove_superfluous_states(eqs::Vector{Equation}, outputs)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs) # will be used for the dependency graph
     neweqs = sys.eqs # the ODESystem might reorder the equations
@@ -89,32 +89,32 @@ function reduce_superflous_states(eqs::Vector{Equation}, outputs)
     eq_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
     # find the attracting components, remove attracting components which do not include eqs
     attr_components = attracting_components(graph)
-    deleq = []
+    removable = []
     for attr in attr_components
         if isempty(Set(eq_idx) ∩ Set(attr))
-            append!(deleq, attr)
+            append!(removable, attr)
         end
     end
-    @assert isunique(deleq)
-    deleteat!(neweqs, sort(deleq))
+    @assert isunique(removable)
+    deleteat!(neweqs, sort(removable))
 
     # reduction has to be repeated recursively
     if neweqs == eqs
         return neweqs
     else
-        return reduce_superflous_states(neweqs, outputs)
+        return remove_superfluous_states(neweqs, outputs)
     end
 end
 
 """
-    reduce_algebraic_states(eqs:Vector{Equation}, skip=[])
+    remove_algebraic_states(eqs:Vector{Equation}, skip=[])
 
 Reduces the number of equations by substituting explicit algebraic equations.
 Returns a tuple containing two `Vector{Equations}`
   - the new equations with substituted states
-  - the algebraic states which have been substituted
+  - the algebraic states which have been removed
 
-The optional skip argument is used to declare states which should not be reduced.
+The optional skip argument is used to declare states which should not be removed.
 
 This function checks for cyclic dependencies between algebraic equations by generating
 a dependency graph between them. All substitutions have to be pairwise cycle free.
@@ -125,26 +125,26 @@ julia> eqs = [D(x) ~ i,
               o1 ~ x + o2,
               D(y) ~ i,
               o2 ~ y + o1];
-julia> reduce_algebraic_states(eqs)
+julia> remove_algebraic_states(eqs)
 (Equation[Equation((D'~t)(x), i),
           Equation(o1, x + (o1 + y)),
           Equation((D'~t)(y), i)],
  Equation[Equation(o2, o1 + y)])
 ```
 """
-function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
-    neweqs = deepcopy(eqs)
+function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
+    reduced_eqs = deepcopy(eqs)
 
     # only consider states for reduction which are explicit algebraic and not in skip
     condition = eq -> is_explicit_algebraic(eq) && !(Set(get_variables(eq.lhs)) ⊆ Set(skip))
-    algebraic_idx = findall(condition, neweqs)
+    algebraic_idx = findall(condition, reduced_eqs)
 
     # symbols of all algebraic eqs
-    symbols = [eq.lhs for eq ∈ neweqs[algebraic_idx]]
+    symbols = [eq.lhs for eq ∈ reduced_eqs[algebraic_idx]]
 
     # generate dependency graph
     g = SimpleDiGraph(length(algebraic_idx))
-    for (i, eq) in enumerate(neweqs[algebraic_idx])
+    for (i, eq) in enumerate(reduced_eqs[algebraic_idx])
         rhs_vars = vars(eq.rhs)
         for (isym, sym) in enumerate(symbols)
             if Set([sym]) ⊆ Set(rhs_vars)
@@ -152,18 +152,19 @@ function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
             end
         end
     end
-    reducable = algebraic_idx[pairwise_cycle_free(g)]
+    removable = algebraic_idx[pairwise_cycle_free(g)]
+    @assert isunique(removable)
 
-    rules = Dict(eq.lhs => eq.rhs for eq in neweqs[reducable])
+    rules = Dict(eq.lhs => eq.rhs for eq in reduced_eqs[removable])
     # subsitute all the equations, remove substituted
-    for (i, eq) in enumerate(neweqs)
-        neweqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+    for (i, eq) in enumerate(reduced_eqs)
+        reduced_eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
-    @assert isunique(reducable)
-    red_eqs = neweqs[reducable]
-    deleteat!(neweqs, sort(reducable))
 
-    return neweqs, red_eqs
+    removed_eqs = reduced_eqs[removable]
+    deleteat!(reduced_eqs, sort(removable))
+
+    return reduced_eqs, removed_eqs
 end
 
 """

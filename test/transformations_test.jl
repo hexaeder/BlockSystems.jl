@@ -26,57 +26,57 @@ end
         @test pairwise_cycle_free(g) == [3,5]
     end
 
-    @testset "reduce superflous states" begin
-        using IOSystems: reduce_superflous_states
+    @testset "remove superfluous states" begin
+        using IOSystems: remove_superfluous_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
         @derivatives D'~t
         eqs = [D(x) ~ x,
                D(y) ~ y,
                o ~ a^b]
-        reqs = reduce_superflous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, [x])
         @test reqs == eqs[[1]]
-        reqs = reduce_superflous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, [y])
         @test reqs == eqs[[2]]
-        reqs = reduce_superflous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, [o])
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ y,
                D(y) ~ x+o,
                o ~ a^b]
-        reqs = reduce_superflous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, [y])
         @test reqs == eqs
-        reqs = reduce_superflous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, [x])
         @test reqs == eqs
-        reqs = reduce_superflous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, [o])
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ x+o,
                D(y) ~ y,
                o ~ a^b]
-        reqs = reduce_superflous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, [x])
         @test reqs == eqs[[1,3]]
-        reqs = reduce_superflous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, [y])
         @test reqs == eqs[[2]]
-        reqs = reduce_superflous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, [o])
         @test reqs == eqs[[3]]
     end
 
-    @testset "reduce algebraic states" begin
-        using IOSystems: reduce_algebraic_states
+    @testset "remove algebraic states" begin
+        using IOSystems: remove_algebraic_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
         @derivatives D'~t
-        # variable o can be reduced
+        # variable o can be removed
         eqs = [D(x) ~ x + o,
                D(y) ~ y + o,
                o ~ a^b]
-        reqs = reduce_algebraic_states(eqs)
+        reqs = remove_algebraic_states(eqs)
         @test reqs[1] == [D(x) ~ x + a^b,
                           D(y) ~ y + a^b]
         @test reqs[2] == [o ~ a^b]
 
         eqs = [D(x) ~ i + o,
                o ~ x + i]
-        reqs = reduce_algebraic_states(eqs)
+        reqs = remove_algebraic_states(eqs)
         @test reqs[1] == [D(x) ~ i + (x + i)]
         @test reqs[2] == [o ~ x + i]
 
@@ -84,20 +84,20 @@ end
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
-        reqs = reduce_algebraic_states(eqs)
+        reqs = remove_algebraic_states(eqs)
         @test reqs[1] == [D(x) ~ i,
                           D(y) ~ i,
                           o1 ~ x + (y + o1)]
         @test reqs[2] == [o2 ~ y + o1]
 
-        rreqs = reduce_algebraic_states(reqs[1])
+        rreqs = remove_algebraic_states(reqs[1])
         @test rreqs[1] == reqs[1]
         @test rreqs[2] == []
 
         # test skip condition
         eqs = [D(x) ~ i + o,
                o ~ x + i]
-        reqs = reduce_algebraic_states(eqs, skip=[o])
+        reqs = remove_algebraic_states(eqs, skip=[o])
         @test reqs[1] == eqs
         @test reqs[2] == []
 
@@ -105,13 +105,13 @@ end
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
-        reqs = reduce_algebraic_states(eqs, skip=[o1])
+        reqs = remove_algebraic_states(eqs, skip=[o1])
         @test reqs[1] == [D(x) ~ i,
                           D(y) ~ i,
                           o1 ~ x + (y + o1)]
         @test reqs[2] == [o2 ~ y + o1]
 
-        reqs = reduce_algebraic_states(eqs, skip=[o2])
+        reqs = remove_algebraic_states(eqs, skip=[o2])
         @test reqs[1] == [D(x) ~ i,
                           D(y) ~ i,
                           o2 ~ y + (x + o2)]
@@ -164,6 +164,6 @@ end
                D(B₊x2) ~ in4,
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
         @test eqs == iob.system.eqs
-        @test iob.reduced_equations == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
+        @test iob.removed_eqs == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
     end
 end
