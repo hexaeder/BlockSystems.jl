@@ -81,6 +81,10 @@ struct IOBlock <: AbstractIOSystem
         @check Set(inputs ∪ iparams) == Set(parameters(os)) "inputs ∪ iparams != params"
         @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
 
+        additional_vars = vars([eq.rhs for eq in reduced_equations])
+        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams)
+        @check additional_vars ⊆ all_vars "reduced eqs should not introduce new variables"
+
         new(name, inputs, iparams, istates, outputs, os, reduced_equations)
     end
 end
