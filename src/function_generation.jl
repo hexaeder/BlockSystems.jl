@@ -14,7 +14,6 @@ optional:
 - `first_states`: define states=(istates ∪ outputs) which should appear first
 - `first_inputs`: define inputs which should appear first
 - `first_params`: define parameters which should appear first
-- `simplify=true`: call simplify on the equations before building?
 - `expression=Val{false}`: toggle expression and callable function output
 
 Returns an named tuple with the fields
@@ -33,9 +32,9 @@ Returns an named tuple with the fields
 """
 function generate_io_function(ios::AbstractIOSystem; type=:auto,
                               first_states = [], first_inputs = [], first_params = [],
-                              simplify=true, expression = Val{false}, verbose=false)
+                              expression = Val{false}, verbose=false)
     if ios isa IOSystem
-        @info "Transform given System to Block"
+        @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
     end
     # first_outputs, first_inputs and first_params may be given in namepsace version
@@ -81,12 +80,6 @@ function generate_io_function(ios::AbstractIOSystem; type=:auto,
         throw(ArgumentError("Unknown type $type"))
     end
 
-    # simplify equations if wanted
-    if simplify
-        eqs = ModelingToolkit.simplify.(eqs)
-        verbose && @info "Simplified eqs" eqs
-    end
-
     # substitute x(t) by x for all terms
     state_syms = makesym.(states, states=[])
     input_syms = makesym.(inputs, states=[])
@@ -100,10 +93,17 @@ function generate_io_function(ios::AbstractIOSystem; type=:auto,
     # generate functions
     if type == :ode
         f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
-        return (f_oop=f_oop, f_ip=f_ip, massm=mass_matrix, states=state_syms, inputs=input_syms, params=param_syms)
+        return (f_oop=f_oop, f_ip=f_ip,
+                massm=mass_matrix,
+                states=state_syms,
+                inputs=input_syms,
+                params=param_syms)
     elseif type == :static
         f_oop, f_ip = build_function(formulas, input_syms, param_syms, ios.system.iv; expression = expression)
-        return (f_oop=f_oop, f_ip=f_ip, states=state_syms, inputs=input_syms, params=param_syms)
+        return (f_oop=f_oop, f_ip=f_ip,
+                states=state_syms,
+                inputs=input_syms,
+                params=param_syms)
     end
 end
 
