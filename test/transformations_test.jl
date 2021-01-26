@@ -70,44 +70,52 @@ end
                D(y) ~ y + o,
                o ~ a^b]
         reqs = reduce_algebraic_states(eqs)
-        @test reqs == [D(x) ~ x + a^b,
-                       D(y) ~ y + a^b]
+        @test reqs[1] == [D(x) ~ x + a^b,
+                          D(y) ~ y + a^b]
+        @test reqs[2] == [o ~ a^b]
 
         eqs = [D(x) ~ i + o,
                o ~ x + i]
         reqs = reduce_algebraic_states(eqs)
-        @test reqs == [D(x) ~ i + (x + i)]
+        @test reqs[1] == [D(x) ~ i + (x + i)]
+        @test reqs[2] == [o ~ x + i]
 
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs)
-        @test reqs == [D(x) ~ i,
-                       D(y) ~ i,
-                       o1 ~ x + (y + o1)]
+        @test reqs[1] == [D(x) ~ i,
+                          D(y) ~ i,
+                          o1 ~ x + (y + o1)]
+        @test reqs[2] == [o2 ~ y + o1]
 
-        @test reduce_algebraic_states(reqs) == reqs
+        rreqs = reduce_algebraic_states(reqs[1])
+        @test rreqs[1] == reqs[1]
+        @test rreqs[2] == []
 
         # test skip condition
         eqs = [D(x) ~ i + o,
                o ~ x + i]
         reqs = reduce_algebraic_states(eqs, skip=[o])
-        @test reqs == eqs
+        @test reqs[1] == eqs
+        @test reqs[2] == []
 
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
         reqs = reduce_algebraic_states(eqs, skip=[o1])
-        @test reqs == [D(x) ~ i,
-                       D(y) ~ i,
-                       o1 ~ x + (y + o1)]
+        @test reqs[1] == [D(x) ~ i,
+                          D(y) ~ i,
+                          o1 ~ x + (y + o1)]
+        @test reqs[2] == [o2 ~ y + o1]
 
         reqs = reduce_algebraic_states(eqs, skip=[o2])
-        @test reqs == [D(x) ~ i,
-                       D(y) ~ i,
-                       o2 ~ y + (x + o2)]
+        @test reqs[1] == [D(x) ~ i,
+                          D(y) ~ i,
+                          o2 ~ y + (x + o2)]
+        @test reqs[2] == [o1 ~ x + o2]
     end
 
     @testset "test of connect_system" begin
@@ -149,12 +157,13 @@ end
         @test Set(sys.outputs) == Set(iob.outputs)
         @test iob.name == sys.name
 
-        @variables A₊x1(t) A₊x2(t) B₊x1(t) B₊x2(t)
+        @variables A₊x1(t) A₊x2(t) B₊x1(t) B₊x2(t) A₊o(t) B₊o(t)
         eqs = [D(A₊x1) ~ a * in1,
                D(A₊x2) ~ in2,
                D(B₊x1) ~ b * in3,
                D(B₊x2) ~ in4,
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
         @test eqs == iob.system.eqs
+        @test iob.reduced_equations == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
     end
 end

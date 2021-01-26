@@ -13,8 +13,9 @@ Recursively transform `IOSystems` to `IOBlocks`.
 Parameters:
 - `ios`: system to connect
 - `verbose=false`: toggle verbosity (show equations at different steps)
+- `simplify_eqs=true`: toggle simplification of all equations at the end
 """
-function connect_system(ios::IOSystem; verbose=false)
+function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -33,24 +34,15 @@ function connect_system(ios::IOSystem; verbose=false)
 
     verbose && @info "subsitute inputs with outputs" eqs
 
-    # TODO: check assumption
-    # - each state is represented by one lhs
-    # - lhs only first order or algebraic
-    # - no self loop in algebraic (not needed?)
-    # - check that every variable found in the equations is referenced by namespace map
-    # - dependency graph does not work correctly for implicit algebraic states! forbid them
-    #   -> does this have implications for the reduction of depended explicit a states?
-
     # get red of unused states
     # (internal variables which are not used for the outputs)
     reduced_eqs1 = reduce_superflous_states(eqs, keys(ios.outputs_map))
-    verbose && @info "w/o superflous states" reduced_eqs1
+    verbose && @info "without superflous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    reduced_eqs2 = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
-    verbose && @info "with reduced algebraic states" reduced_eqs2
+    (reduced_eqs2, expl_alg_eqs) = reduce_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
+    verbose && @info "without explicit algebraic states" reduced_eqs2
 
-    # TODO redo namespace promotion after deletion of states?
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
 
@@ -58,12 +50,21 @@ function connect_system(ios::IOSystem; verbose=false)
     for (i, eq) in enumerate(promoted_eqs)
         promoted_eqs[i] = eqsubstitute(eq, namespace_promotion)
     end
-    verbose && @info "promoted namespaces" promoted_eqs
+    for (i, eq) in enumerate(expl_alg_eqs)
+        expl_alg_eqs[i] = eqsubstitute(eq, namespace_promotion)
+    end
+    verbose && @info "promoted namespaces" promoted_eqs expl_alg_eqs
+
+    if simplify_eqs
+        promoted_eqs = simplify.(promoted_eqs)
+        expl_alg_eqs = simplify.(expl_alg_eqs)
+        verbose && @info "simplified" promoted_eqs expl_alg_eqs
+    end
 
     try
-        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name)
+        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name, reduced_eq = expl_alg_eqs)
     catch e
-        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs
+        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs expl_alg_eqs
         throw(e)
     end
 end
@@ -109,7 +110,9 @@ end
     reduce_algebraic_states(eqs:Vector{Equation}, skip=[])
 
 Reduces the number of equations by substituting explicit algebraic equations.
-Returns a new set of equations.
+Returns a tuple containing two `Vector{Equations}`
+  - the new equations with substituted states
+  - the algebraic states which have been substituted
 
 The optional skip argument is used to declare states which should not be reduced.
 
@@ -123,10 +126,10 @@ julia> eqs = [D(x) ~ i,
               D(y) ~ i,
               o2 ~ y + o1];
 julia> reduce_algebraic_states(eqs)
-3-element Array{Equation,1}:
- Equation(Differential(x), i)
- Equation(o1, x + (y + o1))
- Equation(Differential(y), i)
+(Equation[Equation((D'~t)(x), i),
+          Equation(o1, x + (o1 + y)),
+          Equation((D'~t)(y), i)],
+ Equation[Equation(o2, o1 + y)])
 ```
 """
 function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
@@ -157,9 +160,10 @@ function reduce_algebraic_states(eqs::Vector{Equation}; skip=[])
         neweqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
     @assert isunique(reducable)
+    red_eqs = neweqs[reducable]
     deleteat!(neweqs, sort(reducable))
 
-    return neweqs
+    return neweqs, red_eqs
 end
 
 """
@@ -191,4 +195,20 @@ function pairwise_cycle_free(g::SimpleDiGraph)
             return idx
         end
     end
+end
+
+"""
+    is_explicit_algebraic(eq::Equation)
+
+True if lhs is a single symbol x and x ∉ rhs!
+"""
+function is_explicit_algebraic(eq::Equation)
+    if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
+        vars = get_variables(eq.lhs)
+        @assert length(vars) == 1
+        return vars[1] ∉ Set(get_variables(eq.rhs))
+    else
+        return false
+    end
+
 end

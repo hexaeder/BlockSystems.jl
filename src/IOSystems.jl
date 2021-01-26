@@ -82,9 +82,12 @@ struct IOBlock <: AbstractIOSystem
         @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
 
         additional_vars = vars([eq.rhs for eq in reduced_equations])
-        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams)
+        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams ∪ (os.iv, ))
         @check additional_vars ⊆ all_vars "reduced eqs should not introduce new variables"
 
+        # TODO: check IOBlock assumptions in inner constructor
+        # - each state is represented by one lhs (static or diff) or implicit algebraic equation?
+        # - lhs only first order or algebraic
         new(name, inputs, iparams, istates, outputs, os, reduced_equations)
     end
 end
@@ -105,7 +108,8 @@ using IOSystems, ModelingToolkit
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
+function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs;
+                 name = gensym(:IOBlock), reduced_eq = Equation[])
     os = ODESystem(eqs, name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -113,7 +117,7 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym
     istates = setdiff(os.states, outputs)
     iparams = setdiff(parameters(os), inputs)
 
-    IOBlock(name, inputs, iparams, istates, outputs, os, Equation[])
+    IOBlock(name, inputs, iparams, istates, outputs, os, reduced_eq)
 end
 
 """
@@ -152,6 +156,8 @@ struct IOSystem <: AbstractIOSystem
     outputs_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
+# TODO: check IOSystem assumptions in inner constructor?
+# - check that every variable found in the equations is referenced by namespace map
 
 independent_variable(sys::IOSystem) = independent_variable(first(sys.systems))
 
@@ -325,22 +331,6 @@ Strips `x` of its first namespace. `A₊B₊x -> B₊x`
 remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") => ""))
 remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
 remove_namespace(x::Term) = rename(x, remove_namespace(x.op.name))
-
-"""
-    is_explicit_algebraic(eq::Equation)
-
-True if lhs is a single symbol x and x ∉ rhs!
-"""
-function is_explicit_algebraic(eq::Equation)
-    if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
-        vars = get_variables(eq.lhs)
-        @assert length(vars) == 1
-        return vars[1] ∉ Set(get_variables(eq.rhs))
-    else
-        return false
-    end
-
-end
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
