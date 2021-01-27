@@ -95,7 +95,7 @@ function remove_superfluous_states(eqs::Vector{Equation}, outputs)
             append!(removable, attr)
         end
     end
-    @assert isunique(removable)
+    @assert allunique(removable)
     deleteat!(neweqs, sort(removable))
 
     # reduction has to be repeated recursively
@@ -153,7 +153,7 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
         end
     end
     removable = algebraic_idx[pairwise_cycle_free(g)]
-    @assert isunique(removable)
+    @assert allunique(removable)
 
     rules = Dict(eq.lhs => eq.rhs for eq in reduced_eqs[removable])
     # subsitute all the equations, remove substituted
@@ -196,20 +196,4 @@ function pairwise_cycle_free(g::SimpleDiGraph)
             return idx
         end
     end
-end
-
-"""
-    is_explicit_algebraic(eq::Equation)
-
-True if lhs is a single symbol x and x ∉ rhs!
-"""
-function is_explicit_algebraic(eq::Equation)
-    if eq.lhs isa Sym || eq.lhs isa Term && !(eq.lhs.op isa Differential)
-        vars = get_variables(eq.lhs)
-        @assert length(vars) == 1
-        return vars[1] ∉ Set(get_variables(eq.rhs))
-    else
-        return false
-    end
-
 end

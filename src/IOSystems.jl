@@ -11,22 +11,7 @@ using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem
 
-"""
-   check(cond, msg)
-
-If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
-TODO: Proper Output
-"""
-macro check(cond::Expr, msg)
-    variables = ()
-    for a in cond.args[2:end]
-        if a isa Expr || a isa Symbol
-            variables = (esc(a), variables...)
-        end
-    end
-    print = :(@show($(repr(cond)),$(variables...)))
-    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
-end
+include("utils.jl")
 
 """
 abstract supertype for [`IOBlock`](@ref) and [`IOSystem`](@ref).
@@ -54,9 +39,6 @@ namespace_inputs(ios::AbstractIOSystem)  = namespace_property(ios, :inputs)
 namespace_iparams(ios::AbstractIOSystem) = namespace_property(ios, :iparams)
 namespace_istates(ios::AbstractIOSystem) = namespace_property(ios, :istates)
 namespace_outputs(ios::AbstractIOSystem) = namespace_property(ios, :outputs)
-
-isunique(collection) = length(collection) == length(unique(collection))
-uniquenames(syms) = isunique(getname.(syms))
 
 """
 $(TYPEDEF)
@@ -190,12 +172,12 @@ function IOSystem(cons,
                   autopromote = true
                   )
     namespaces = [sys.name for sys in io_systems]
-    @check isunique(namespaces) "Namespace collision in subsystems!"
+    @check allunique(namespaces) "Namespace collision in subsystems!"
 
     ivs = unique([independent_variable(sys) for sys in io_systems])
     @check length(ivs) == 1 "Multiple independent variables!"
 
-    @check isunique(first.(cons)) "Multiple connections to same input!"
+    @check allunique(first.(cons)) "Multiple connections to same input!"
     namespaced_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
     namespaced_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
     namespaced_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
@@ -308,31 +290,6 @@ function create_namespace_promotions(syms, forbidden)
     end
     return dict
 end
-
-
-"""
-    remove_namespace(namespace, x)
-
-If first namespace of `x` is `namespace` then remove it.
-```
-remove_namespace(A, A₊B₊x) -> B₊x
-remove_namespace(B, A₊B₊x) -> A₊B₊x
-````
-"""
-remove_namespace(namespace, name::T) where T = T(replace(String(name), Regex("^$(namespace)₊") => ""))
-remove_namespace(namespace, x::Sym) = rename(x, remove_namespace(namespace, x.name))
-remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, x.op.name))
-
-"""
-    remove_namespace(x)
-
-Strips `x` of its first namespace. `A₊B₊x -> B₊x`
-"""
-remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") => ""))
-remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
-remove_namespace(x::Term) = rename(x, remove_namespace(x.op.name))
-
-eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
 include("transformations.jl")
 include("function_generation.jl")
