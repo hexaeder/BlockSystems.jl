@@ -110,20 +110,19 @@ end
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
     for (i, eq) in enumerate(eqs)
-        if isequal(eq.lhs, 0) || (eq.lhs isa Term && eq.lhs.op isa Differential)
+        if eq.lhs isa Term && eq.lhs.op isa Differential
             continue
-        else
-            eqs[i] = 0 ~ eq.rhs - eq.lhs
         end
+        eqs[i] = 0 ~ eq.rhs - eq.lhs
     end
     return eqs
 end
 
 function reorder_by_states(eqs::AbstractVector{Equation}, states)
     @assert length(eqs) == length(states) "Numbers of eqs should be equal to states!"
-
-    eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->s ∈ Set(ModelingToolkit.vars(x.lhs)), eqs) for s in states]
-
+    # for each state, collect the eq_idx which corresponds some states (implicit
+    # agebraic) don't have special equations attached to them those are the "undused_idx"
+    eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->isequal(s, lhs_var(x)), eqs) for s in states]
     unused_idx = reverse(setdiff(1:length(eqs), eq_idx))
     for i in 1:length(eq_idx)
         if eq_idx[i] === nothing

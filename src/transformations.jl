@@ -136,7 +136,10 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
     reduced_eqs = deepcopy(eqs)
 
     # only consider states for reduction which are explicit algebraic and not in skip
-    condition = eq -> is_explicit_algebraic(eq) && !(Set(get_variables(eq.lhs)) ⊆ Set(skip))
+    condition = eq -> begin
+        (type, var) = eq_type(eq)
+        type == :explicit_algebraic && var ∉ Set(skip)
+    end
     algebraic_idx = findall(condition, reduced_eqs)
 
     # symbols of all algebraic eqs
