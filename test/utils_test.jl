@@ -1,6 +1,8 @@
 using Test
 using IOSystems
 using ModelingToolkit
+using ModelingToolkit: value
+using SymbolicUtils
 
 @info "Tests of utils.jl"
 
@@ -77,5 +79,12 @@ using ModelingToolkit
         @test eq_type(y ~ x^2) == (:explicit_algebraic, y.val)
         @test eq_type(x ~ y^2) == (:explicit_algebraic, x.val)
         @test eq_type(0 ~ x + y) == (:implicit_algebraic, nothing)
+    end
+
+    @testset "recusive subsitute" begin
+        using IOSystems: recursive_substitute
+        @syms a b c
+        rules = Dict([a=>b+2, b=>c])
+        @test isequal(recursive_substitute(a, rules), c+2)
     end
 end

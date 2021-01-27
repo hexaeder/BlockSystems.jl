@@ -75,3 +75,18 @@ end
 Returns the variable on the lhs of the equation for equations.
 """
 lhs_var(eq::Equation) = eq_type(eq)[2]
+
+
+"""
+    recusive_substitute(term, rules::Dict)
+
+Apply substitutions until there is no more change in `term`.
+"""
+function recursive_substitute(term, rules::Dict)
+    new_term = substitute(term, rules)
+    while !isequal(new_term, term)
+        term = new_term
+        new_term = substitute(term, rules)
+    end
+    return new_term
+end

@@ -74,6 +74,17 @@ end
                           D(y) ~ y + a^b]
         @test reqs[2] == [o ~ a^b]
 
+        # variable o1 and o2 can be removed
+        eqs = [D(x) ~ x + o1+o2,
+               D(y) ~ y + o2,
+               o1 ~ a^b + o2,
+               o2 ~ a-b]
+        reqs = remove_algebraic_states(eqs)
+        @test reqs[1] == [D(x) ~ x + a^b + a-b + a-b,
+                          D(y) ~ y + a-b]
+        @test reqs[2] == [o1 ~ a^b + a - b,
+                          o2 ~ a - b]
+
         eqs = [D(x) ~ i + o,
                o ~ x + i]
         reqs = remove_algebraic_states(eqs)

@@ -161,7 +161,7 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
     rules = Dict(eq.lhs => eq.rhs for eq in reduced_eqs[removable])
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
-        reduced_eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+        reduced_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
     end
 
     removed_eqs = reduced_eqs[removable]
