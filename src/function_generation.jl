@@ -30,9 +30,9 @@ Returns an named tuple with the fields
 - `params` symbols of parameters (in order)
 
 """
-function generate_io_function(ios::AbstractIOSystem; type=:auto,
-                              first_states = [], first_inputs = [], first_params = [],
-                              expression = Val{false}, verbose=false)
+function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [],
+                              first_params = [], first_removed = [],
+                              expression = Val{false}, verbose=false, type=:auto)
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)

@@ -62,7 +62,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     end
 
     try
-        IOBlock(promoted_eqs, ios.inputs, ios.outputs, name=ios.name, removed_eq=removed_eqs)
+        IOBlock(ios.name, promoted_eqs, ios.inputs, ios.outputs, removed_eqs)
     catch e
         @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs removed_eqs
         throw(e)

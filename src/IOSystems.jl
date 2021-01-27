@@ -53,24 +53,35 @@ struct IOBlock <: AbstractIOSystem
     istates::Vector{Symbolic}
     outputs::Vector{Symbolic}
     system::ODESystem
+    removed_states::Vector{Symbolic}
     removed_eqs::Vector{Equation}
 
-    function IOBlock(name, inputs, iparams, istates, outputs, os, removed_eqs)
-        @check Set(inputs) ⊆ Set(parameters(os)) "inputs must be parameters"
-        @check Set(outputs) ⊆ Set(states(os)) "outputs must be variables"
-        @check Set(iparams) ⊆ Set(parameters(os)) "iparams must be parameters"
-        @check Set(istates) ⊆ Set(states(os)) "istates must be variables"
-        @check Set(inputs ∪ iparams) == Set(parameters(os)) "inputs ∪ iparams != params"
-        @check Set(outputs ∪ istates) == Set(states(os)) "outputs ∪ istates != states"
+    function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs)
+        @check Set(inputs) ⊆ Set(parameters(odes)) "inputs must be parameters"
+        @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
+        @check Set(iparams) ⊆ Set(parameters(odes)) "iparams must be parameters"
+        @check Set(istates) ⊆ Set(states(odes)) "istates must be variables"
+        @check Set(inputs ∪ iparams) == Set(parameters(odes)) "inputs ∪ iparams != params"
+        @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
-        additional_vars = vars([eq.rhs for eq in removed_eqs])
-        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams ∪ (os.iv, ))
+        additional_vars = vars([eq.rhs for eq in rem_eqs])
+        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams ∪ (odes.iv, ))
         @check additional_vars ⊆ all_vars "removed eqs should not contain new variables"
+
+        if isempty(rem_eqs)
+            rem_states = Symbolic[]
+        else
+            rem_states = lhs_var.(rem_eqs)
+            @info "union" rem_states rem_eqs
+            @check isempty(rem_states ∩ all_vars) "removed states should not appear in in/out/is/ip"
+            rem_rhs_vars = union([vars(eq.rhs) for eq in rem_eqs]...)
+            @check rem_rhs_vars ⊆ all_vars "rhs of removed eqs should be subset of in/out/is/ip"
+        end
 
         # TODO: check IOBlock assumptions in inner constructor
         # - each state is represented by one lhs (static or diff) or implicit algebraic equation?
         # - lhs only first order or algebraic
-        new(name, inputs, iparams, istates, outputs, os, removed_eqs)
+        new(name, inputs, iparams, istates, outputs, odes, rem_states, rem_eqs)
     end
 end
 
@@ -90,8 +101,11 @@ using IOSystems, ModelingToolkit
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs;
-                 name = gensym(:IOBlock), removed_eq = Equation[])
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
+    IOBlock(name, eqs, inputs, outputs, Equation[])
+end
+
+function IOBlock(name, eqs, inputs, outputs, rem_eqs)
     os = ODESystem(eqs, name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -99,8 +113,9 @@ function IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs;
     istates = setdiff(os.states, outputs)
     iparams = setdiff(parameters(os), inputs)
 
-    IOBlock(name, inputs, iparams, istates, outputs, os, removed_eq)
+    IOBlock(name, inputs, iparams, istates, outputs, os, rem_eqs)
 end
+
 
 """
 $(SIGNATURES)
