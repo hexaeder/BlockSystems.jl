@@ -4,7 +4,7 @@ using LinearAlgebra
 using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
-using ModelingToolkit: rename, getname, renamespace, namespace_equations, value, makesym, vars
+using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using SymbolicUtils: Symbolic
 using LightGraphs
@@ -22,7 +22,7 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     if name ∈ fieldnames(typeof(sys))
         return getfield(sys, name)
     end
-    syms = vcat(sys.inputs, sys.iparams, sys.istates, sys.outputs)
+    syms = vcat(sys.inputs, sys.iparams, sys.istates, sys.outputs, sys.removed_states)
 
     i = findfirst(x -> getname(x) == name, syms)
     if i !== nothing
@@ -39,6 +39,7 @@ namespace_inputs(ios::AbstractIOSystem)  = namespace_property(ios, :inputs)
 namespace_iparams(ios::AbstractIOSystem) = namespace_property(ios, :iparams)
 namespace_istates(ios::AbstractIOSystem) = namespace_property(ios, :istates)
 namespace_outputs(ios::AbstractIOSystem) = namespace_property(ios, :outputs)
+namespace_rem_states(ios::AbstractIOSystem) = namespace_property(ios, :removed_states)
 
 """
 $(TYPEDEF)
@@ -57,6 +58,7 @@ struct IOBlock <: AbstractIOSystem
     removed_eqs::Vector{Equation}
 
     function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs)
+        @check name == odes.name "Name of inner ODESystem does not match name of IOBlock"
         @check Set(inputs) ⊆ Set(parameters(odes)) "inputs must be parameters"
         @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
         @check Set(iparams) ⊆ Set(parameters(odes)) "iparams must be parameters"
@@ -72,7 +74,6 @@ struct IOBlock <: AbstractIOSystem
             rem_states = Symbolic[]
         else
             rem_states = lhs_var.(rem_eqs)
-            @info "union" rem_states rem_eqs
             @check isempty(rem_states ∩ all_vars) "removed states should not appear in in/out/is/ip"
             rem_rhs_vars = union([vars(eq.rhs) for eq in rem_eqs]...)
             @check rem_rhs_vars ⊆ all_vars "rhs of removed eqs should be subset of in/out/is/ip"
@@ -86,6 +87,12 @@ struct IOBlock <: AbstractIOSystem
 end
 
 independent_variable(block::IOBlock) = block.system.iv
+
+function namespace_rem_eqs(iob::IOBlock)
+    eqs = iob.removed_eqs
+    isempty(eqs) && return Equation[]
+    map(eq->namespace_equation(eq, iob.name, independent_variable(iob).name), eqs)
+end
 
 """
 $(SIGNATURES)
@@ -124,7 +131,8 @@ Construct a new IOBlock based on an existing. Deep-copy all fields and assigns n
 """
 function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
     cp = deepcopy(iob)
-    IOBlock(cp.system.eqs, cp.inputs, cp.outputs, name=name)
+    odes = ODESystem(cp.system.eqs, cp.system.iv, name=name)
+    IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs)
 end
 
 """
@@ -146,6 +154,7 @@ struct IOSystem <: AbstractIOSystem
     iparams::Vector{Symbolic}
     istates::Vector{Symbolic}
     outputs::Vector{Symbolic}
+    removed_states::Vector{Symbolic}
     connections::Dict{Symbolic, Symbolic}
     inputs_map::Dict{Symbolic, Symbolic}
     iparams_map::Dict{Symbolic, Symbolic}
@@ -197,6 +206,7 @@ function IOSystem(cons,
     namespaced_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
     namespaced_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
     namespaced_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
+    namespaced_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
 
     # check validity of provided connections
     @check Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
@@ -225,7 +235,11 @@ function IOSystem(cons,
 
     # auto promotion of the rest
     if autopromote
-        all_symbols = vcat(open_inputs, namespaced_iparams, namespaced_istates, namespaced_outputs)
+        all_symbols = vcat(open_inputs,
+                           namespaced_iparams,
+                           namespaced_istates,
+                           namespaced_outputs,
+                           namespaced_rem_states)
         left_symbols = setdiff(all_symbols, keys(user_promotions))
         auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
         promotions = merge(user_promotions, auto_promotions)
@@ -249,6 +263,10 @@ function IOSystem(cons,
     for s in namespaced_outputs
         out_map[s] = promotions[s]
     end
+    rem_map = Dict()
+    for s in namespaced_rem_states
+        rem_map[s] = promotions[s]
+    end
 
     # assert that there are no namespace clashes. this should be allways true!
     @assert uniquenames(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
@@ -263,6 +281,7 @@ function IOSystem(cons,
         collect(values(ip_map)),
         collect(values(is_map)),
         collect(values(out_map)),
+        collect(values(rem_map)),
         Dict(cons),
         in_map,
         ip_map,

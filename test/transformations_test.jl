@@ -177,4 +177,58 @@ end
         @test eqs == iob.system.eqs
         @test iob.removed_eqs == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
     end
+
+    @testset "system with removed equations in subsystem" begin
+        #=
+           +------+         +---------+
+        +->| x'=i |--+------| o=a1+a2 |--o
+        |  +------+  |   +--|         |
+        |  +------+  |   |  +---------+
+        +--| o = i|<-+   |
+           +------+      |
+           +------+      |
+        +->| x'=i |--+---+
+        |  +------+  |
+        |  +------+  |
+        +--| o = i|<-+
+           +------+
+        =#
+        # same system as in testset before
+        @parameters t i(t)
+        @variables x(t) o(t)
+        @derivatives D'~t
+
+        b1 = IOBlock([D(x) ~ i], [i], [x], name=:a)
+        b2 = IOBlock([o ~ i], [i], [o], name=:b)
+        subsys = IOSystem([b1.i=>b2.o, b2.i=>b1.x], [b1, b2], name=:A,
+                          outputs_map = [b1.x=>x])
+        @test Set(subsys.removed_states) == Set()
+
+        subsysA = connect_system(subsys)
+        @test subsysA.system.eqs == [D(x) ~ x]
+        @test Set(subsysA.removed_states) == Set([o])
+        @test subsysA.removed_eqs == [o ~ x]
+
+        subsysB = IOBlock(subsysA, name=:B)
+        @test subsysB.name == :B
+        @test subsysB.system.name == :B
+        @test subsysB.system.eqs == [D(x) ~ x]
+        @test Set(subsysB.removed_states) == Set([o])
+        @test subsysB.removed_eqs == [o ~ x]
+
+        @parameters a1(t) a2(t)
+        adder = IOBlock([o ~ a1 + a2], [a1, a2], [o], name=:add)
+
+        system = IOSystem([adder.a1=>subsysA.x, adder.a2=>subsysB.x],
+                          [adder, subsysA, subsysB])
+
+        @test Set(system.removed_states) == Set([subsysA.o, subsysB.o])
+
+        systemblock = connect_system(system, verbose=true)
+        @test systemblock.system.name == systemblock.name == system.name
+        @test Set(systemblock.removed_states) == Set(system.removed_states)
+
+        using IOSystems: namespace_rem_eqs
+        @test systemblock.removed_eqs == vcat(namespace_rem_eqs(subsysA), namespace_rem_eqs(subsysB))
+    end
 end

@@ -43,6 +43,9 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     (reduced_eqs2, removed_eqs) = remove_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
     verbose && @info "without explicit algebraic states" reduced_eqs2
 
+    # add all of the removed_eqs of the subsystem
+    removed_eqs = vcat(removed_eqs, [namespace_rem_eqs(iob) for iob in ios.systems]...)
+
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
 

@@ -33,6 +33,7 @@ using LightGraphs
         @test Set(iob.iparams) == Set([a, b])
         @test Set(iob.istates) == Set([x1, x2])
         @test Set(iob.outputs) == Set([o1, o2])
+        @test Set(iob.removed_states) == Set()
 
         @test_throws ArgumentError IOBlock(eqs, [x1], [o1,o2])
         @test_throws ArgumentError IOBlock(eqs, [i1,i2], [i1,o1,o2])
