@@ -149,11 +149,13 @@ function generate_massmatrix(eqs::AbstractVector{Equation})
 end
 
 function all_static(eqs::AbstractVector{Equation})
-    # TODO: all_static should check for cross dependencies (o1 = a, o2 = o1 + i1)
-    for i in 1:length(eqs)
-        if eqs[i].lhs isa Term && eqs[i].lhs.op isa Differential
-            return false
+    tupels = eq_type.(eqs)
+    if all(first.(tupels) .== :explicit_algebraic)
+        lhs = last.(tupels)
+        rhs = vcat([get_variables(eq.rhs) for eq in eqs]...)
+        if isempty(Set(lhs) ∩ Set(rhs))
+            return true
         end
     end
-    return true
+    return false
 end

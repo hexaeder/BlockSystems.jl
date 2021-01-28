@@ -82,7 +82,7 @@ using LinearAlgebra
         @test !all_static(eqs)
         eqs = [o1 ~ a*i1 + i2 + o2,
                o2 ~ b*i1 + i2]
-        @test_broken !all_static(eqs)
+        @test !all_static(eqs)
     end
 
     @testset "ode function generation" begin
