@@ -153,13 +153,14 @@ By doing so we get access to a named tuple with the fileds
 - `gen.states` symbols of states (in order)
 - `gen.inputs` symbols of inputs (in order)
 - `gen.params` symbols of parameters (in order)
+- (see docstring for full list)
 
 The functions have the form
 `f_ip(du, u, inputs, params, t)`
 where `u` are all the states (outputs stacked on top of internal states) and `t` is the independent variable of the system.
 The order of the inputs and states can be controlled.
 =#
-gen = generate_io_function(space_controller, first_states=[altitude, v], first_params=[K, M])
+gen = generate_io_function(space_controller, f_states=[altitude, v], f_params=[K, M])
 @info "Generated function" gen.massm gen.states gen.inputs gen.params
 nothing # hide
 
@@ -219,7 +220,7 @@ space_controller = IOSystem([prop_v.i => spacecraft.v,
                             outputs_map = [spacecraft.x => altitude])
 
 space_controller = connect_system(space_controller)
-gen = generate_io_function(space_controller, first_states=[altitude, v], first_params=[prop_c.K, M, prop_v.K])
+gen = generate_io_function(space_controller, f_states=[altitude, v], f_params=[prop_c.K, M, prop_v.K])
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
 p = [1.0, 1.0, 0.5] # propc, M, propv
@@ -268,7 +269,7 @@ space_controller = connect_system(space_controller, verbose=false)
 @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
 
 # and we can simulate and plot the system
-gen = generate_io_function(space_controller, first_states=[altitude], first_params=[K, T, M])
+gen = generate_io_function(space_controller, f_states=[altitude], f_params=[K, T, M])
 @info "order of parameters" gen.params
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)

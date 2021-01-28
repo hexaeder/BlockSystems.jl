@@ -23,6 +23,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
         end
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
+    removed_eqs = vcat([namespace_rem_eqs(iob) for iob in ios.systems]...)
 
     verbose && @info "Transform IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs ios.connections eqs
 
@@ -30,6 +31,9 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     connections = ios.connections
     for (i, eq) in enumerate(eqs)
         eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
+    end
+    for (i, eq) in enumerate(removed_eqs)
+        removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
     end
 
     verbose && @info "substitute inputs with outputs" eqs
@@ -40,11 +44,11 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    (reduced_eqs2, removed_eqs) = remove_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
-    verbose && @info "without explicit algebraic states" reduced_eqs2
+    (reduced_eqs2, new_rem_eqs) = remove_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
+    verbose && @info "without explicit algebraic states" reduced_eqs2 new_rem_eqs
 
     # add all of the removed_eqs of the subsystem
-    removed_eqs = vcat(removed_eqs, [namespace_rem_eqs(iob) for iob in ios.systems]...)
+    removed_eqs = vcat(new_rem_eqs, removed_eqs)
 
     # apply the namespace transformations
     namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)

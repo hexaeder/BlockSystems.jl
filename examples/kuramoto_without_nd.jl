@@ -1,6 +1,6 @@
 #=
 ## Network Dynamics without NetworkDynamics.jl
-In this example we want to explor the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
+In this example we want to explore the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
 But this time without `NetworkDynamics.jl` ...
 =#
 
@@ -103,9 +103,9 @@ nothing #hide
 # As the output shows the system has be reduced to just N equations.
 # Well now we can generate the functions...
 gen = generate_io_function(networkblock,
-                           first_states=[v.ϕ for v in vert_blocks],
-                           first_params=vcat([v.ω for v in vert_blocks],
-                                             [e.K for e in edge_blocks]))
+                           f_states=[v.ϕ for v in vert_blocks],
+                           f_params=vcat([v.ω for v in vert_blocks],
+                                         [e.K for e in edge_blocks]))
 nothing #hide
 
 # ... enclose the `f_ip` to get rid of the empty `inputs` field...

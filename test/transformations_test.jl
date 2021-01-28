@@ -193,7 +193,6 @@ end
         +--| o = i|<-+
            +------+
         =#
-        # same system as in testset before
         @parameters t i(t)
         @variables x(t) o(t)
         @derivatives D'~t
@@ -230,5 +229,21 @@ end
 
         using IOSystems: namespace_rem_eqs
         @test systemblock.removed_eqs == vcat(namespace_rem_eqs(subsysA), namespace_rem_eqs(subsysB))
+
+        # psst, i'm putting a test for function_generation here, don't tell ma
+        gen = generate_io_function(systemblock,
+                                   f_states=[systemblock.A₊x, systemblock.B₊x],
+                                   f_rem_states=[systemblock.A₊o, systemblock.B₊o])
+        @test Set(gen.states) == Set(Sym{Real}.([:B₊x, :A₊x, :add₊o]))
+        @test Set(gen.inputs) == Set()
+        @test Set(gen.params) == Set()
+        @test Set(gen.rem_states) == Set(Sym{Real}.([:B₊o, :A₊o]))
+        systemblock.removed_eqs
+
+        out = zeros(2)
+        st = rand(3)
+        gen.g_ip(out, st, (), (), (), 0.0)
+        @test out == st[1:2]
+        @test gen.g_oop(st, (), (), (), 0.0) == st[1:2]
     end
 end

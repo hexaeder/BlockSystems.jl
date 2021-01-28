@@ -11,49 +11,58 @@ Parameters:
 - `ios`: the system to build the function
 optional:
 - `type=:auto`: `:ode` or `:static`, determines the output of the function
-- `first_states`: define states=(istates ∪ outputs) which should appear first
-- `first_inputs`: define inputs which should appear first
-- `first_params`: define parameters which should appear first
+- `f_states`: define states=(istates ∪ outputs) which should appear first
+- `f_inputs`: define inputs which should appear first
+- `f_params`: define parameters which should appear first
+- `f_rem_states`: define removed states algebraic state order
 - `expression=Val{false}`: toggle expression and callable function output
 
 Returns an named tuple with the fields
 - for `type=:ode`:
   - `f_ip` in-place function `f(dstates, states, inputs, params, iv)`
   - `f_oop` out-of-place function `f(states, inputs, params, iv) => dstates`
-  - `massm` mass matrix of the system
 - for `type=:static`:
   - `f_ip` in-place function `f(states, inputs, params, iv)`
   - `f_oop` out-of-place function `f(inputs, params, iv) => states`
 - always:
+- `massm` mass matrix of the system (`nothing` if :static)
 - `states` symbols of states (in order)
 - `inputs` symbols of inputs (in order)
 - `params` symbols of parameters (in order)
-
+- `rem_states` symbols of removed states (in order)
+- `g_ip`, `g_oop` functions `g((opt. out), states, inputs, params, iv)` to calculate the
+  removed states (substituted expl. algebraic equations). `nothing` if empty.
 """
-function generate_io_function(ios::AbstractIOSystem; first_states = [], first_inputs = [],
-                              first_params = [], first_removed = [],
+function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [],
+                              f_params = [], f_rem_states = [],
                               expression = Val{false}, verbose=false, type=:auto)
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
     end
-    # first_outputs, first_inputs and first_params may be given in namepsace version
-    first_states = remove_namespace.(ios.name, value.(first_states))
-    first_inputs = remove_namespace.(ios.name, value.(first_inputs))
-    first_params = remove_namespace.(ios.name, value.(first_params))
+    # f_outputs, f_inputs and f_params may be given in namepsace version
+    f_states = remove_namespace.(ios.name, value.(f_states))
+    f_inputs = remove_namespace.(ios.name, value.(f_inputs))
+    f_params = remove_namespace.(ios.name, value.(f_params))
+    f_rem_states = remove_namespace.(ios.name, value.(f_rem_states))
 
-    Set(first_states) ⊆ (Set(ios.outputs) ∪ Set(ios.istates)) || throw(ArgumentError("first_states !⊆ (outputs ∪ istates)"))
-    Set(first_inputs) ⊆ Set(ios.inputs) || throw(ArgumentError("first_inputs !⊆ inputs"))
-    Set(first_params) ⊆ Set(ios.iparams) || throw(ArgumentError("first_params !⊆ iparams"))
+    Set(f_states) ⊆ (Set(ios.outputs) ∪ Set(ios.istates)) || throw(ArgumentError("f_states !⊆ (outputs ∪ istates)"))
+    Set(f_inputs) ⊆ Set(ios.inputs) || throw(ArgumentError("f_inputs !⊆ inputs"))
+    Set(f_params) ⊆ Set(ios.iparams) || throw(ArgumentError("f_params !⊆ iparams"))
+    Set(f_rem_states) ⊆ Set(ios.removed_states) || throw(ArgumentError("f_rem_states !⊆ removed_states"))
 
     # enforce ordering of states, inputs and params
-    states = vcat(first_states, ios.outputs, ios.istates) |> unique
-    inputs = vcat(first_inputs, ios.inputs) |> unique
-    params = vcat(first_params, ios.iparams) |> unique
+    states = vcat(f_states, ios.outputs, ios.istates) |> unique
+    inputs = vcat(f_inputs, ios.inputs) |> unique
+    params = vcat(f_params, ios.iparams) |> unique
+    rem_states = vcat(f_rem_states, ios.removed_states) |> unique
 
     # warning
-    if length(first_states) != length(states) || length(first_inputs) != length(inputs) || length(first_params) != length(params)
-        @warn "The ordering of the states/inputs/params might change from run to run. Therefore it is highly recommend to provide all variables in the first_* arguments" states inputs params
+    if length(f_states) != length(states) ||
+        length(f_inputs) != length(inputs) ||
+        length(f_params) != length(params) ||
+        length(f_rem_states) != length(rem_states)
+        @warn "The ordering of the states/inputs/params/rem_states might change from run to run. Therefore it is highly recommend to provide all variables in the f_* arguments" states inputs params
     end
 
     # reorder the equations to get du in the right order
@@ -76,6 +85,7 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
         verbose && @info "Reordered by states and generated mass matrix" mass_matrix
     elseif type == :static
         all_static(eqs) || throw(ArgumentError("Equations of system are not static!"))
+        mass_matrix = nothing
     else
         throw(ArgumentError("Unknown type $type"))
     end
@@ -84,6 +94,7 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
     state_syms = makesym.(states, states=[])
     input_syms = makesym.(inputs, states=[])
     param_syms = makesym.(params, states=[])
+    rem_state_syms = makesym.(rem_states, states=[])
 
     sub = merge(Dict(states .=> state_syms),
                 Dict(inputs .=> input_syms),
@@ -93,18 +104,28 @@ function generate_io_function(ios::AbstractIOSystem; first_states = [], first_in
     # generate functions
     if type == :ode
         f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
-        return (f_oop=f_oop, f_ip=f_ip,
-                massm=mass_matrix,
-                states=state_syms,
-                inputs=input_syms,
-                params=param_syms)
     elseif type == :static
         f_oop, f_ip = build_function(formulas, input_syms, param_syms, ios.system.iv; expression = expression)
-        return (f_oop=f_oop, f_ip=f_ip,
-                states=state_syms,
-                inputs=input_syms,
-                params=param_syms)
     end
+
+    # generate functions for removed states
+    if isempty(rem_states)
+        g_oop = nothing; g_ip = nothing
+    else
+        rem_eqs = reorder_by_states(ios.removed_eqs, rem_states)
+        verbose && @info "Reordered removed eqs" rem_eqs rem_states
+
+        rem_formulas = [substitute(eq.rhs, sub) for eq in rem_eqs]
+        g_oop, g_ip = build_function(rem_formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
+    end
+
+    return (f_oop=f_oop, f_ip=f_ip,
+            massm=mass_matrix,
+            states=state_syms,
+            inputs=input_syms,
+            params=param_syms,
+            g_oop=g_oop, g_ip=g_ip,
+            rem_states=rem_state_syms)
 end
 
 function transform_algebraic_equations(eqs::AbstractVector{Equation})

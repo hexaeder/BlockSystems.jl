@@ -96,19 +96,23 @@ using LinearAlgebra
         @test isequal(iof.inputs, [Sym{Real}(:i)])
         @test isequal(iof.states, Sym{Real}.([:x, :y]))
         @test isequal(iof.params, [Sym{Real}(:a)])
+        @test isequal(iof.params, [Sym{Real}(:a)])
+        @test iof.g_ip === nothing
+        @test iof.g_oop === nothing
+        @test isempty(iof.rem_states)
 
         @test iof.f_oop([-1,1], [4], [-1], 0) == [-4, -1]
         a = Vector{Float64}(undef, 2)
         iof.f_ip(a, [-1,1], [4], [-1], 0)
         @test a == [-4, -1]
 
-        iof = generate_io_function(iob, first_states=[y])
+        iof = generate_io_function(iob, f_states=[y])
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
-        iof = generate_io_function(iob, first_states=[iob.y])
+        iof = generate_io_function(iob, f_states=[iob.y])
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
     end
 
-    @testset "ode function generation" begin
+    @testset "static function generation" begin
         @parameters t a i1(t) i2(t)
         @variables x(t) y(t)
         @derivatives D'~t
@@ -137,19 +141,19 @@ using LinearAlgebra
 
         allequal(v1, v2) = all([isequal(e1, e2) for (e1, e2) ∈ zip(v1, v2)])
 
-        gen = generate_io_function(iob, first_states=[o1, o2])
+        gen = generate_io_function(iob, f_states=[o1, o2])
         @test allequal(gen.states, makesym.([o1, o2], states=[]))
-        gen = generate_io_function(iob, first_states=[o2, o1])
+        gen = generate_io_function(iob, f_states=[o2, o1])
         @test allequal(gen.states, makesym.([o2, o1], states=[]))
 
-        gen = generate_io_function(iob, first_inputs=[i1, i2])
+        gen = generate_io_function(iob, f_inputs=[i1, i2])
         @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
-        gen = generate_io_function(iob, first_inputs=[i2, i1])
+        gen = generate_io_function(iob, f_inputs=[i2, i1])
         @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
 
-        gen = generate_io_function(iob, first_params=[a, b])
+        gen = generate_io_function(iob, f_params=[a, b])
         @test allequal(gen.params, makesym.([a, b], states=[]))
-        gen = generate_io_function(iob, first_params=[b, a])
+        gen = generate_io_function(iob, f_params=[b, a])
         @test allequal(gen.params, makesym.([b, a], states=[]))
     end
 end
