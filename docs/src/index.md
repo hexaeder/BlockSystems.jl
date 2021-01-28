@@ -34,7 +34,7 @@ An `IOBlock` consists of a set of equations, a set of inputs and outputs and a n
 
 ```@docs
 IOBlock
-IOBlock(eqs::AbstractVector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
+IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
 ```
 An `IOSystem` consists of multiple `AbstractIOSystems` and the connections between them.
 ```@docs
