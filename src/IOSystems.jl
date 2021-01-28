@@ -156,10 +156,7 @@ struct IOSystem <: AbstractIOSystem
     outputs::Vector{Symbolic}
     removed_states::Vector{Symbolic}
     connections::Dict{Symbolic, Symbolic}
-    inputs_map::Dict{Symbolic, Symbolic}
-    iparams_map::Dict{Symbolic, Symbolic}
-    istates_map::Dict{Symbolic, Symbolic}
-    outputs_map::Dict{Symbolic, Symbolic}
+    namespace_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
 # TODO: check IOSystem assumptions in inner constructor?
@@ -174,24 +171,22 @@ Construct a new IOSystem from various subsystems.
 Parameters
  - `cons`: the connections in the form `sub2.input => sub2.output`
  - `io_systems`: Vector of subsystems
- - `inputs_map`, `iparams_map`, `istates_map`:
-   Provide custom namespace promotion / renaming i.e. `sub1.input => voltage`.
-   Variables without entry in the map will be promoted automatically.
- - `outputs_map`:
-   Provide custom namespace promotion for outputs. If this parameter is not given,
-   all of the outputs (connected and unconnected) will be marked as outputs of the whole
-   system. If the outputs map is given only the given outputs will be marked as outputs.
-   All other outputs of subsystems will become internal states of the connected system
+ - `namespace_map`: Provide collection of custom namespace promotions / renamings
+   i.e. `sub1.input => voltage`. Variables without entry in the map will be
+   promoted automatically. Automatic promotion means that the sub-namespace is
+   removed whenever it is possible without naming conflicts. The map may contain
+   inputs, outputs, istates, iparams and removed_states. TODO: Allow :symbols in rhs.
+ - `outputs`: Per default, all of the subsystem outputs will become system outputs. However,
+   by providing a list of variables as outputs *only these* will become outputs of the
+   new system. All other sub-outputs will become internal states of the connected system
    (and might be optimized away in `connect_system`).
  - `name`: namespace
  - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
 """
 function IOSystem(cons,
                   io_systems::Vector{<:AbstractIOSystem};
-                  inputs_map = nothing,
-                  iparams_map = nothing,
-                  istates_map = nothing,
-                  outputs_map = nothing,
+                  namespace_map = nothing,
+                  outputs = :all,
                   name = gensym(:IOSystem),
                   autopromote = true
                   )
@@ -202,69 +197,66 @@ function IOSystem(cons,
     @check length(ivs) == 1 "Multiple independent variables!"
 
     @check allunique(first.(cons)) "Multiple connections to same input!"
-    namespaced_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
-    namespaced_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
-    namespaced_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
-    namespaced_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
-    namespaced_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
+    nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
+    nspcd_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
+    nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
+    nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
+    nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
 
     # check validity of provided connections
-    @check Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
-    @check Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
+    @check Set(first.(cons)) ⊆ Set(nspcd_inputs) "First argument in connection needs to be input of subsystem."
+    @check Set(last.(cons)) ⊆ Set(nspcd_outputs) "Second argument in connection needs to be output of subsystem."
     # reduce the inputs to the open inputs
-    open_inputs = setdiff(namespaced_inputs, first.(cons))
+    open_inputs = setdiff(nspcd_inputs, first.(cons))
 
     # check validity of provided namespace maps
-    inputs_map = fix_map_types(inputs_map)
-    @check keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
-    iparams_map = fix_map_types(iparams_map)
-    @check keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
-    istates_map = fix_map_types(istates_map)
-    @check keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
-    outputs_map = fix_map_types(outputs_map)
-    @check keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
-    user_promotions = merge(inputs_map, iparams_map, istates_map, outputs_map)
-    @check uniquenames(values(user_promotions)) "naming conflict in rhs of user provided namespace promotions"
+    namespace_map = fix_map_types(namespace_map)
+    allowed_lhs = Set(open_inputs ∪ nspcd_iparams ∪ nspcd_istates ∪ nspcd_outputs ∪ nspcd_rem_states)
+    @check keys(namespace_map) ⊆ Set(allowed_lhs) "namespace_map keys contain unknown symbols"
+    @check uniquenames(values(namespace_map)) "naming conflict in rhs of user provided namespace promotions"
 
-    # if the user provided a map of outputs, those outputs which are note referenced become states!
-    if !isempty(outputs_map)
-        former_outputs = setdiff(namespaced_outputs, keys(outputs_map))
-        namespaced_istates = vcat(namespaced_istates, former_outputs)
-        namespaced_outputs = keys(outputs_map) |> collect
+    # if the user provided a list of outputs, all other outputs become istates
+    if outputs != :all
+        # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
+        for (i, o) in enumerate(outputs)
+            if o ∉ Set(nspcd_outputs)
+                key = findfirst(v->isequal(v, o), namespace_map)
+                @check key ∈ Set(nspcd_outputs) "Output $o ∉ outputs ∪ outputs_promoted"
+                outputs[i] = key
+            end
+        end
+        former_outputs = setdiff(nspcd_outputs, outputs)
+        nspcd_istates  = vcat(nspcd_istates, former_outputs)
+        nspcd_outputs  = outputs |> collect
     end
+
+    # TODO continue here
 
     # auto promotion of the rest
-    if autopromote
-        all_symbols = vcat(open_inputs,
-                           namespaced_iparams,
-                           namespaced_istates,
-                           namespaced_outputs,
-                           namespaced_rem_states)
-        left_symbols = setdiff(all_symbols, keys(user_promotions))
-        auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
-        promotions = merge(user_promotions, auto_promotions)
-    else
-        promotions = user_promotions
-    end
+    all_symbols = vcat(open_inputs, nspcd_iparams, nspcd_istates, nspcd_outputs, nspcd_rem_states)
+    left_symbols = setdiff(all_symbols, keys(user_promotions))
+    auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
+    promotions = merge(user_promotions, auto_promotions)
+
 
     in_map = Dict()
     for s in open_inputs
         in_map[s] = promotions[s]
     end
     ip_map = Dict()
-    for s in namespaced_iparams
+    for s in nspcd_iparams
         ip_map[s] = promotions[s]
     end
     is_map = Dict()
-    for s in namespaced_istates
+    for s in nspcd_istates
         is_map[s] = promotions[s]
     end
     out_map = Dict()
-    for s in namespaced_outputs
+    for s in nspcd_outputs
         out_map[s] = promotions[s]
     end
     rem_map = Dict()
-    for s in namespaced_rem_states
+    for s in nspcd_rem_states
         rem_map[s] = promotions[s]
     end
 
