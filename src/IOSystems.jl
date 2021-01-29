@@ -9,7 +9,7 @@ using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eq
 using SymbolicUtils: Symbolic
 using LightGraphs
 
-export AbstractIOSystem, IOBlock, IOSystem
+export AbstractIOSystem, IOBlock, IOSystem, independent_variable
 
 include("utils.jl")
 
@@ -156,10 +156,7 @@ struct IOSystem <: AbstractIOSystem
     outputs::Vector{Symbolic}
     removed_states::Vector{Symbolic}
     connections::Dict{Symbolic, Symbolic}
-    inputs_map::Dict{Symbolic, Symbolic}
-    iparams_map::Dict{Symbolic, Symbolic}
-    istates_map::Dict{Symbolic, Symbolic}
-    outputs_map::Dict{Symbolic, Symbolic}
+    namespace_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
 # TODO: check IOSystem assumptions in inner constructor?
@@ -174,121 +171,90 @@ Construct a new IOSystem from various subsystems.
 Parameters
  - `cons`: the connections in the form `sub2.input => sub2.output`
  - `io_systems`: Vector of subsystems
- - `inputs_map`, `iparams_map`, `istates_map`:
-   Provide custom namespace promotion / renaming i.e. `sub1.input => voltage`.
-   Variables without entry in the map will be promoted automatically.
- - `outputs_map`:
-   Provide custom namespace promotion for outputs. If this parameter is not given,
-   all of the outputs (connected and unconnected) will be marked as outputs of the whole
-   system. If the outputs map is given only the given outputs will be marked as outputs.
-   All other outputs of subsystems will become internal states of the connected system
+ - `namespace_map`: Provide collection of custom namespace promotions / renamings
+   i.e. `sub1.input => voltage`. Variables without entry in the map will be
+   promoted automatically. Automatic promotion means that the sub-namespace is
+   removed whenever it is possible without naming conflicts. The map may contain
+   inputs, outputs, istates, iparams and removed_states. TODO: Allow :symbols in rhs.
+ - `outputs`: Per default, all of the subsystem outputs will become system outputs. However,
+   by providing a list of variables as outputs *only these* will become outputs of the
+   new system. All other sub-outputs will become internal states of the connected system
    (and might be optimized away in `connect_system`).
  - `name`: namespace
  - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
 """
 function IOSystem(cons,
                   io_systems::Vector{<:AbstractIOSystem};
-                  inputs_map = nothing,
-                  iparams_map = nothing,
-                  istates_map = nothing,
-                  outputs_map = nothing,
+                  namespace_map = nothing,
+                  outputs = :all,
                   name = gensym(:IOSystem),
                   autopromote = true
                   )
     namespaces = [sys.name for sys in io_systems]
-    @check allunique(namespaces) "Namespace collision in subsystems!"
+    allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
 
     ivs = unique([independent_variable(sys) for sys in io_systems])
-    @check length(ivs) == 1 "Multiple independent variables!"
+    length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
 
     @check allunique(first.(cons)) "Multiple connections to same input!"
-    namespaced_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
-    namespaced_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
-    namespaced_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
-    namespaced_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
-    namespaced_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
+    nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
+    nspcd_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
+    nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
+    nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
+    nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
 
     # check validity of provided connections
-    @check Set(first.(cons)) ⊆ Set(namespaced_inputs) "First argument in connection needs to be input of subsystem."
-    @check Set(last.(cons)) ⊆ Set(namespaced_outputs) "Second argument in connection needs to be output of subsystem."
+    @check Set(first.(cons)) ⊆ Set(nspcd_inputs) "First argument in connection needs to be input of subsystem."
+    @check Set(last.(cons)) ⊆ Set(nspcd_outputs) "Second argument in connection needs to be output of subsystem."
     # reduce the inputs to the open inputs
-    open_inputs = setdiff(namespaced_inputs, first.(cons))
+    open_inputs = setdiff(nspcd_inputs, first.(cons))
 
     # check validity of provided namespace maps
-    inputs_map = fix_map_types(inputs_map)
-    @check keys(inputs_map) ⊆ Set(open_inputs) "inputs_map !⊆ open_inputs"
-    iparams_map = fix_map_types(iparams_map)
-    @check keys(iparams_map) ⊆ Set(namespaced_iparams) "iparams_map !⊆ iparams"
-    istates_map = fix_map_types(istates_map)
-    @check keys(istates_map) ⊆ Set(namespaced_istates) "istates_map !⊆ istates"
-    outputs_map = fix_map_types(outputs_map)
-    @check keys(outputs_map) ⊆ Set(namespaced_outputs) "outputs_map !⊆ outputs"
-    user_promotions = merge(inputs_map, iparams_map, istates_map, outputs_map)
-    @check uniquenames(values(user_promotions)) "naming conflict in rhs of user provided namespace promotions"
+    namespace_map = fix_map_types(namespace_map)
+    allowed_lhs = Set(open_inputs ∪ nspcd_iparams ∪ nspcd_istates ∪ nspcd_outputs ∪ nspcd_rem_states)
+    @check keys(namespace_map) ⊆ Set(allowed_lhs) "namespace_map keys contain unknown symbols"
+    @check uniquenames(values(namespace_map)) "naming conflict in rhs of user provided namespace promotions"
 
-    # if the user provided a map of outputs, those outputs which are note referenced become states!
-    if !isempty(outputs_map)
-        former_outputs = setdiff(namespaced_outputs, keys(outputs_map))
-        namespaced_istates = vcat(namespaced_istates, former_outputs)
-        namespaced_outputs = keys(outputs_map) |> collect
+    # if the user provided a list of outputs, all other outputs become istates
+    if outputs != :all
+        outputs = value.(outputs)
+        # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
+        for (i, o) in enumerate(outputs)
+            if o ∉ Set(nspcd_outputs)
+                key = findfirst(v->isequal(v, o), namespace_map)
+                key∉Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
+                outputs[i] = key
+            end
+        end
+        former_outputs = setdiff(nspcd_outputs, outputs)
+        nspcd_istates  = vcat(nspcd_istates, former_outputs)
+        nspcd_outputs  = outputs |> collect
     end
 
     # auto promotion of the rest
-    if autopromote
-        all_symbols = vcat(open_inputs,
-                           namespaced_iparams,
-                           namespaced_istates,
-                           namespaced_outputs,
-                           namespaced_rem_states)
-        left_symbols = setdiff(all_symbols, keys(user_promotions))
-        auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
-        promotions = merge(user_promotions, auto_promotions)
-    else
-        promotions = user_promotions
-    end
+    all_symbols = vcat(open_inputs, nspcd_iparams, nspcd_istates, nspcd_outputs, nspcd_rem_states)
+    left_symbols = setdiff(all_symbols, keys(namespace_map))
 
-    in_map = Dict()
-    for s in open_inputs
-        in_map[s] = promotions[s]
-    end
-    ip_map = Dict()
-    for s in namespaced_iparams
-        ip_map[s] = promotions[s]
-    end
-    is_map = Dict()
-    for s in namespaced_istates
-        is_map[s] = promotions[s]
-    end
-    out_map = Dict()
-    for s in namespaced_outputs
-        out_map[s] = promotions[s]
-    end
-    rem_map = Dict()
-    for s in namespaced_rem_states
-        rem_map[s] = promotions[s]
-    end
+    auto_promotions = create_namespace_promotions(collect(left_symbols), values(namespace_map), autopromote)
+
+    namespace_map = merge(namespace_map, auto_promotions)
 
     # assert that there are no namespace clashes. this should be allways true!
-    @assert uniquenames(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
-    @assert uniquenames(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
-    @assert uniquenames(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
-    @assert uniquenames(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespace promotion not unique"
-    @assert uniquenames(vcat(collect.(values.([in_map, ip_map, is_map, out_map]))...)) "rhs of namespace promotion not unique"
+    @assert uniquenames(keys(namespace_map)) "ERROR: complete namespace map lhs not unique"
+    @assert uniquenames(values(namespace_map)) "ERROR: complete namespace map lhs not unique"
 
-    IOSystem(
-        name,
-        collect(values(in_map)),
-        collect(values(ip_map)),
-        collect(values(is_map)),
-        collect(values(out_map)),
-        collect(values(rem_map)),
-        Dict(cons),
-        in_map,
-        ip_map,
-        is_map,
-        out_map,
-        io_systems,
-      )
+    nmspc_promote = ModelingToolkit.substituter(namespace_map)
+    inputs  = nmspc_promote.(open_inputs)
+    iparams = nmspc_promote.(nspcd_iparams)
+    istates = nmspc_promote.(nspcd_istates)
+    outputs = nmspc_promote.(nspcd_outputs)
+    rem_states = nmspc_promote.(nspcd_rem_states)
+
+    IOSystem(name,
+             inputs, iparams, istates, outputs, rem_states,
+             Dict(cons),
+             namespace_map,
+             io_systems)
 end
 
 """
@@ -309,18 +275,24 @@ end
 fix_map_types(::Nothing) = Dict()
 
 """
-    create_namepsace_promotions(syms, forbidden)
+    create_namepsace_promotions(syms, forbidden, autopromote)
 
 Takes two lists of Symbols, `syms` and `forbidden`. Returns a Dict of namespace
 promotions for each symbol in `syms`. Avoids name collisions inside the list as well
 as with the `forbidden` symbols.
 """
-function create_namespace_promotions(syms, forbidden)
-    promoted = remove_namespace.(syms)
+function create_namespace_promotions(syms, forbidden, autopromote)
     dict = Dict()
-    for i in 1:length(syms)
-        forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
-        dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
+    if autopromote
+        promoted = remove_namespace.(syms)
+        for i in 1:length(syms)
+            forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
+            dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
+        end
+    else
+        for i in 1:length(syms)
+            dict[syms[i]] = syms[i]
+        end
     end
     return dict
 end

@@ -11,12 +11,12 @@ using LinearAlgebra
         @parameters t a b
         @variables x(t) y(t)
         @derivatives D'~t
-        eqs = [D(x)~y,
+        eqs = [D(x) ~ y,
                y ~ x,
                2*b + 8 ~ a + a,
                1 ~ x + y]
         eqs = transform_algebraic_equations(eqs)
-        @test eqs == [D(x)~y,
+        @test eqs == [D(x) ~ y,
                       0 ~ x - y,
                       0 ~ (a + a) - (2*b + 8),
                       0 ~ (x + y) - 1]
@@ -27,7 +27,7 @@ using LinearAlgebra
         @parameters t
         @variables x(t) y(t) a(t) b(t)
         @derivatives D'~t
-        eqs = [D(x)~x, D(y)~y, 0 ~ x+y+a, 0 ~ x+y+b]
+        eqs = [D(x) ~ x, D(y) ~ y, 0 ~ x+y+a, 0 ~ x+y+b]
         @test reorder_by_states(eqs, [x,y,a,b]) == eqs[[1,2,3,4]]
         @test reorder_by_states(eqs, [y,x,a,b]) == eqs[[2,1,3,4]]
         @test reorder_by_states(eqs, [a,x,y,b]) == eqs[[3,1,2,4]]
@@ -62,10 +62,10 @@ using LinearAlgebra
         @parameters t
         @variables x(t) y(t) a(t) b(t)
         @derivatives D'~t
-        eqs = [D(x)~x, D(y)~y, 0 ~ x+y+a, 0 ~ x+y+b]
+        eqs = [D(x) ~ x, D(y) ~ y, 0 ~ x+y+a, 0 ~ x+y+b]
         @test generate_massmatrix(eqs) == Diagonal([1,1,0,0])
         @test generate_massmatrix(eqs[[1,3,2,4]]) == Diagonal([1,0,1,0])
-        eqs = [D(x)~x, D(y)~y]
+        eqs = [D(x) ~ x, D(y) ~ y]
         @test generate_massmatrix(eqs) == I
     end
 
@@ -89,7 +89,7 @@ using LinearAlgebra
         @parameters t a i(t)
         @variables x(t) y(t)
         @derivatives D'~t
-        iob = IOBlock([D(x)~a*i, D(y)~x], [i], [x, y])
+        iob = IOBlock([D(x) ~ a*i, D(y) ~ x], [i], [x, y])
 
         iof = generate_io_function(iob);
         @test iof.massm == I
@@ -116,7 +116,7 @@ using LinearAlgebra
         @parameters t a i1(t) i2(t)
         @variables x(t) y(t)
         @derivatives D'~t
-        iob = IOBlock([x~a*i1, y~i2], [i1, i2], [x, y])
+        iob = IOBlock([x ~ a*i1, y ~ i2], [i1, i2], [x, y])
 
         iof = generate_io_function(iob);
 
@@ -137,7 +137,7 @@ using LinearAlgebra
         @variables o1(t) o2(t)
         @derivatives D'~t
 
-        iob = IOBlock([D(o1)~a*i1 + b, D(o2)~o1+i2], [i1, i2], [o1, o2])
+        iob = IOBlock([D(o1) ~ a*i1 + b, D(o2) ~ o1+i2], [i1, i2], [o1, o2])
 
         allequal(v1, v2) = all([isequal(e1, e2) for (e1, e2) ∈ zip(v1, v2)])
 

@@ -90,12 +90,12 @@ end
 
 #=
 We want the `connect_system` to get rid of the algebraic states for the edges. Therefore
-we have to provide an `outputs_map` which only contains the outputs of the vertices. By doing
+we have to provide a list of `outputs` which only contains the outputs of the vertices. By doing
 so the edge outputs will become `istates` of the `IOSystem` and upon connection might be reduced.
 =#
-out_map = [block.ϕ => block.ϕ for block in vert_blocks]
+outputs = [block.ϕ for block in vert_blocks]
 
-network = IOSystem(connections, vcat(vert_blocks, edge_blocks), outputs_map=out_map)
+network = IOSystem(connections, vcat(vert_blocks, edge_blocks), outputs=outputs)
 
 networkblock = connect_system(network, verbose=true)
 nothing #hide

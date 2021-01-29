@@ -36,7 +36,7 @@ nothing # hide
 We want to model a controller which takes a desired altitude as an input parameter and outputs the force for thrusters.
 
 ## Simple proportional controller
-A proportional controller takes an input ``i`` and calculates the output proportional to the input.
+A proportional controller takes an input `i` and calculates the output proportional to the input.
 ```math
  o(t) = K\cdot i(t)
 ```
@@ -83,22 +83,28 @@ feedback(t)--|--m(t) --|        |   *--------*        |
 ```
 
 If we don't provide additional information the system will try to promote all of the enclosed
-variables to the new syste mwide namespace.
+variables to the new systemwide namespace.
 =#
 prop_c = IOSystem([prop.i => diff.Δ], # connect input of prop to output of diff
                   [diff, prop], # subsystems
                   name=:propc)
-@info "namespace mapping" prop_c.inputs_map prop_c.istates_map prop_c.outputs_map
+@info "namespace mapping" prop_c.namespace_map
 
 #=
-For finer control it is often prefered to give new names manually:
+For finer control, it is often preferred to give new names manually, this is done with the
+`namespace_map` argument. Per default, all of the outputs of the subsystems will become outputs
+of the connected system (in this case also the output `diff.Δ`). We can prevent this by supplying
+the `outputs` argument manually. Sub outputs which are not referenced here will become internal
+states of the connected system.
 =#
 @parameters target(t) feedback(t)
 prop_c = IOSystem([prop.i => diff.Δ], [diff, prop],
-                  outputs_map = [prop.o => o],
-                  inputs_map = [diff.p => target, diff.m => feedback],
+                  namespace_map = [prop.o => o,
+                                   diff.p => target,
+                                   diff.m => feedback],
+                  outputs = [o],
                   name=:propc)
-@info "namespace mapping" prop_c.inputs_map prop_c.istates_map prop_c.outputs_map
+@info "namespace mapping" prop_c.namespace_map
 
 #=
 Right now, the created object is a container for the two included systems. However,
@@ -133,7 +139,8 @@ target(t)--|-------| prop_c |---| spacecraft |-x(t)--*--|--altitude(t)
 @variables altitude(t)
 space_controller = IOSystem([spacecraft.F => prop_c.o, prop_c.feedback => spacecraft.x],
                             [prop_c, spacecraft],
-                            outputs_map = [spacecraft.x => altitude])
+                            namespace_map = [spacecraft.x => altitude],
+                            outputs = [altitude])
 ## we want to reduce the space_controller to a block
 space_controller = connect_system(space_controller)
 @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
@@ -217,7 +224,8 @@ space_controller = IOSystem([prop_v.i => spacecraft.v,
                              fdiff.m => prop_v.o,
                              spacecraft.F => fdiff.Δ],
                             [prop_v, prop_c, fdiff, spacecraft],
-                            outputs_map = [spacecraft.x => altitude])
+                            namespace_map = [spacecraft.x => altitude],
+                            outputs = [altitude])
 
 space_controller = connect_system(space_controller)
 gen = generate_io_function(space_controller, f_states=[altitude, v], f_params=[prop_c.K, M, prop_v.K])
@@ -255,8 +263,10 @@ pi_c = IOSystem([prop.i => diff.Δ,
                  adder.a1 => prop.o,
                  adder.a2 => int.o],
                 [diff, prop, int, adder],
-                outputs_map = [adder.Σ => o],
-                inputs_map = [diff.p => target, diff.m => feedback],
+                namespace_map = [diff.p => target,
+                                 diff.m => feedback,
+                                 adder.Σ => o],
+                outputs = [o],
                 name=:pi_c)
 nothing # hide
 
@@ -264,7 +274,8 @@ nothing # hide
 
 space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft.x],
                             [pi_c, spacecraft],
-                            outputs_map = [spacecraft.x => altitude])
+                            namespace_map = [spacecraft.x => altitude],
+                            outputs = [altitude])
 space_controller = connect_system(space_controller, verbose=false)
 @info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
 

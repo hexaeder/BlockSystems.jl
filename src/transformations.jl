@@ -40,26 +40,22 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
 
     # get red of unused states
     # (internal variables which are not used for the outputs)
-    reduced_eqs1 = remove_superfluous_states(eqs, keys(ios.outputs_map))
+    nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
+    reduced_eqs1 = remove_superfluous_states(eqs, independent_variable(ios), nspcd_outputs)
     verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
-    (reduced_eqs2, new_rem_eqs) = remove_algebraic_states(reduced_eqs1, skip = keys(ios.outputs_map))
+    (reduced_eqs2, new_rem_eqs) = remove_algebraic_states(reduced_eqs1, skip = nspcd_outputs)
     verbose && @info "without explicit algebraic states" reduced_eqs2 new_rem_eqs
 
     # add all of the removed_eqs of the subsystem
     removed_eqs = vcat(new_rem_eqs, removed_eqs)
 
     # apply the namespace transformations
-    namespace_promotion = merge(ios.inputs_map, ios.iparams_map, ios.istates_map, ios.outputs_map)
+    promotion_rules = ios.namespace_map
+    promoted_eqs = map(eq->eqsubstitute(eq, promotion_rules), reduced_eqs2)
+    removed_eqs  = map(eq->eqsubstitute(eq, promotion_rules), removed_eqs)
 
-    promoted_eqs = deepcopy(reduced_eqs2)
-    for (i, eq) in enumerate(promoted_eqs)
-        promoted_eqs[i] = eqsubstitute(eq, namespace_promotion)
-    end
-    for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = eqsubstitute(eq, namespace_promotion)
-    end
     verbose && @info "promoted namespaces" promoted_eqs removed_eqs
 
     if simplify_eqs
@@ -77,7 +73,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
 end
 
 """
-    remove_superfluous_states(eqs::Vector{Equation}, outputs)
+    remove_superfluous_states(eqs::Vector{Equation}, iv, outputs)
 
 This function removes equations, which are not used in order to generate the given
 `outputs`. It recursively looks for attracting components in the dependency graph which
@@ -86,9 +82,9 @@ Returns a new, reduced set of equations without these states.
 
 TODO: Change strategy, remove i if there is no path from i to outputs.
 """
-function remove_superfluous_states(eqs::Vector{Equation}, outputs)
+function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs)
     neweqs = deepcopy(eqs)
-    sys = ODESystem(neweqs) # will be used for the dependency graph
+    sys = ODESystem(neweqs, iv) # will be used for the dependency graph
     neweqs = sys.eqs # the ODESystem might reorder the equations
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
@@ -109,7 +105,7 @@ function remove_superfluous_states(eqs::Vector{Equation}, outputs)
     if neweqs == eqs
         return neweqs
     else
-        return remove_superfluous_states(neweqs, outputs)
+        return remove_superfluous_states(neweqs, iv, outputs)
     end
 end
 
