@@ -9,7 +9,7 @@ using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eq
 using SymbolicUtils: Symbolic
 using LightGraphs
 
-export AbstractIOSystem, IOBlock, IOSystem
+export AbstractIOSystem, IOBlock, IOSystem, independent_variable
 
 include("utils.jl")
 
@@ -217,11 +217,12 @@ function IOSystem(cons,
 
     # if the user provided a list of outputs, all other outputs become istates
     if outputs != :all
+        outputs = value.(outputs)
         # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
         for (i, o) in enumerate(outputs)
             if o ∉ Set(nspcd_outputs)
                 key = findfirst(v->isequal(v, o), namespace_map)
-                @check key ∈ Set(nspcd_outputs) "Output $o ∉ outputs ∪ outputs_promoted"
+                key∉Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
                 outputs[i] = key
             end
         end
@@ -230,57 +231,30 @@ function IOSystem(cons,
         nspcd_outputs  = outputs |> collect
     end
 
-    # TODO continue here
-
     # auto promotion of the rest
     all_symbols = vcat(open_inputs, nspcd_iparams, nspcd_istates, nspcd_outputs, nspcd_rem_states)
-    left_symbols = setdiff(all_symbols, keys(user_promotions))
-    auto_promotions = create_namespace_promotions(collect(left_symbols), values(user_promotions))
-    promotions = merge(user_promotions, auto_promotions)
+    left_symbols = setdiff(all_symbols, keys(namespace_map))
 
+    auto_promotions = create_namespace_promotions(collect(left_symbols), values(namespace_map), autopromote)
 
-    in_map = Dict()
-    for s in open_inputs
-        in_map[s] = promotions[s]
-    end
-    ip_map = Dict()
-    for s in nspcd_iparams
-        ip_map[s] = promotions[s]
-    end
-    is_map = Dict()
-    for s in nspcd_istates
-        is_map[s] = promotions[s]
-    end
-    out_map = Dict()
-    for s in nspcd_outputs
-        out_map[s] = promotions[s]
-    end
-    rem_map = Dict()
-    for s in nspcd_rem_states
-        rem_map[s] = promotions[s]
-    end
+    namespace_map = merge(namespace_map, auto_promotions)
 
     # assert that there are no namespace clashes. this should be allways true!
-    @assert uniquenames(values(inputs_map)) "namespace promotion of inputs clashed with manually given inputs_map"
-    @assert uniquenames(values(iparams_map)) "namespace promotion of iparams clashed with manually given iparams_map"
-    @assert uniquenames(values(istates_map)) "namespace promotion of istates clashed with manually given istates_map"
-    @assert uniquenames(vcat(collect.(keys.([inputs_map, iparams_map, istates_map, outputs_map]))...)) "lhs of namespace promotion not unique"
-    @assert uniquenames(vcat(collect.(values.([in_map, ip_map, is_map, out_map]))...)) "rhs of namespace promotion not unique"
+    @assert uniquenames(keys(namespace_map)) "ERROR: complete namespace map lhs not unique"
+    @assert uniquenames(values(namespace_map)) "ERROR: complete namespace map lhs not unique"
 
-    IOSystem(
-        name,
-        collect(values(in_map)),
-        collect(values(ip_map)),
-        collect(values(is_map)),
-        collect(values(out_map)),
-        collect(values(rem_map)),
-        Dict(cons),
-        in_map,
-        ip_map,
-        is_map,
-        out_map,
-        io_systems,
-      )
+    nmspc_promote = ModelingToolkit.substituter(namespace_map)
+    inputs  = nmspc_promote.(open_inputs)
+    iparams = nmspc_promote.(nspcd_iparams)
+    istates = nmspc_promote.(nspcd_istates)
+    outputs = nmspc_promote.(nspcd_outputs)
+    rem_states = nmspc_promote.(nspcd_rem_states)
+
+    IOSystem(name,
+             inputs, iparams, istates, outputs, rem_states,
+             Dict(cons),
+             namespace_map,
+             io_systems)
 end
 
 """
@@ -301,18 +275,24 @@ end
 fix_map_types(::Nothing) = Dict()
 
 """
-    create_namepsace_promotions(syms, forbidden)
+    create_namepsace_promotions(syms, forbidden, autopromote)
 
 Takes two lists of Symbols, `syms` and `forbidden`. Returns a Dict of namespace
 promotions for each symbol in `syms`. Avoids name collisions inside the list as well
 as with the `forbidden` symbols.
 """
-function create_namespace_promotions(syms, forbidden)
-    promoted = remove_namespace.(syms)
+function create_namespace_promotions(syms, forbidden, autopromote)
     dict = Dict()
-    for i in 1:length(syms)
-        forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
-        dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
+    if autopromote
+        promoted = remove_namespace.(syms)
+        for i in 1:length(syms)
+            forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
+            dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
+        end
+    else
+        for i in 1:length(syms)
+            dict[syms[i]] = syms[i]
+        end
     end
     return dict
 end

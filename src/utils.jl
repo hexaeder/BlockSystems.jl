@@ -12,7 +12,7 @@ macro check(cond::Expr, msg)
         end
     end
     print = :(@show($(repr(cond)),$(variables...)))
-    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
+    return :(if !$(esc(cond)); $print; throw(ArgumentError(esc($msg))) end)
 end
 
 """
