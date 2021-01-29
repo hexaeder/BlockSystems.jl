@@ -10,7 +10,7 @@ using LightGraphs
     @testset "namespaced accessors" begin
         @parameters t i1(t) i2(t) a
         @variables x1(t) x2(t) o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs  = [D(x1) ~ a*i1, o1~i1, D(x2) ~ i2, o2~i2]
         iob = IOBlock(eqs, [i1, i2], [o1, o2], name=:ns)
         @test Set(IOSystems.namespace_inputs(iob)) == Set([iob.i1, iob.i2])
@@ -22,7 +22,7 @@ using LightGraphs
     @testset "creation of IOBlocks" begin
         @parameters t i1(t) i2(t) a b
         @variables x1(t) x2(t) o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x1) ~ a*i1,
                D(x2) ~ b*i2,
                o1 ~ a*x1,
@@ -70,7 +70,7 @@ using LightGraphs
     @testset "IOBlock from other IOBlock" begin
         @parameters t i1(t) i2(t) a b
         @variables x1(t) x2(t) o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x1) ~ a*i1,
                D(x2) ~ b*i2,
                o1 ~ a*x1,
@@ -92,7 +92,7 @@ using LightGraphs
     @testset "test creation of namespace map" begin
         @parameters t i(t) a b
         @variables x(t) o(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs  = [D(x) ~ a*i, o ~ b*i]
 
         @parameters i2(t) a
@@ -146,7 +146,7 @@ using LightGraphs
         # test assertions for iparams and istats map
         @parameters t a i(t) b c
         @variables x(t) o(t) y(t)
-        @derivatives D'~t
+        D = Differential(t)
         iob1 = IOBlock([D(x)~ i, o~a*x], [i], [o], name=:iob1)
         iob2 = IOBlock([D(x)~ i, o~a*x], [i], [o], name=:iob2)
         IOSystem([iob2.i=>iob1.o], [iob1, iob2])
@@ -186,7 +186,7 @@ using LightGraphs
         =#
         @parameters t i1(t) i2(t) a b ina(t) inb(t)
         @variables x1(t) x2(t) o(t) add(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs1  = [D(x1) ~ a*i1, D(x2)~i2, o~x1+x2]
         iob1 = IOBlock(eqs1, [i1, i2], [o], name=:iob1)
 

@@ -10,7 +10,7 @@ using LinearAlgebra
         using IOSystems: transform_algebraic_equations
         @parameters t a b
         @variables x(t) y(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x) ~ y,
                y ~ x,
                2*b + 8 ~ a + a,
@@ -26,7 +26,7 @@ using LinearAlgebra
         using IOSystems: reorder_by_states
         @parameters t
         @variables x(t) y(t) a(t) b(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x) ~ x, D(y) ~ y, 0 ~ x+y+a, 0 ~ x+y+b]
         @test reorder_by_states(eqs, [x,y,a,b]) == eqs[[1,2,3,4]]
         @test reorder_by_states(eqs, [y,x,a,b]) == eqs[[2,1,3,4]]
@@ -61,7 +61,7 @@ using LinearAlgebra
         using IOSystems: generate_massmatrix
         @parameters t
         @variables x(t) y(t) a(t) b(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x) ~ x, D(y) ~ y, 0 ~ x+y+a, 0 ~ x+y+b]
         @test generate_massmatrix(eqs) == Diagonal([1,1,0,0])
         @test generate_massmatrix(eqs[[1,3,2,4]]) == Diagonal([1,0,1,0])
@@ -73,7 +73,7 @@ using LinearAlgebra
         using IOSystems: all_static
         @parameters t a b i1(t) i2(t)
         @variables o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [o1 ~ a*i1 + i2,
                o2 ~ b*i1 + i2]
         @test all_static(eqs)
@@ -88,7 +88,7 @@ using LinearAlgebra
     @testset "ode function generation" begin
         @parameters t a i(t)
         @variables x(t) y(t)
-        @derivatives D'~t
+        D = Differential(t)
         iob = IOBlock([D(x) ~ a*i, D(y) ~ x], [i], [x, y])
 
         iof = generate_io_function(iob);
@@ -115,7 +115,7 @@ using LinearAlgebra
     @testset "static function generation" begin
         @parameters t a i1(t) i2(t)
         @variables x(t) y(t)
-        @derivatives D'~t
+        D = Differential(t)
         iob = IOBlock([x ~ a*i1, y ~ i2], [i1, i2], [x, y])
 
         iof = generate_io_function(iob);
@@ -135,7 +135,7 @@ using LinearAlgebra
 
         @parameters t a b i1(t) i2(t)
         @variables o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
 
         iob = IOBlock([D(o1) ~ a*i1 + b, D(o2) ~ o1+i2], [i1, i2], [o1, o2])
 

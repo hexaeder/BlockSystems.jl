@@ -24,7 +24,7 @@ function gen_vertex_block(n_in, n_out, name)
     @parameters in_edge[1:n_in](t)
     @parameters out_edge[1:n_out](t)
     @variables ϕ(t)
-    @derivatives D'~(t)
+    D = Differential(t)
 
     rhs = ω
     if n_in > 0

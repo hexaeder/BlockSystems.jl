@@ -46,7 +46,7 @@ using SymbolicUtils
         using IOSystems: eqsubstitute
         @parameters t p i(t) pn inew(t)
         @variables x(t) y xn(t) yn(t)
-        @derivatives D'~t
+        D = Differential(t)
         eq = D(x) ~ x + y + p + i
         @test isequal(eqsubstitute(eq, x=>xn), D(xn) ~ xn + y + p + i)
         @test isequal(eqsubstitute(eq, y=>yn), D(x) ~ x + yn + p + i)
@@ -68,7 +68,7 @@ using SymbolicUtils
         using IOSystems: eq_type
         @parameters t
         @variables x(t) y
-        @derivatives D'~t
+        D = Differential(t)
 
         @test eq_type(D(x) ~ 0) == (:diffeq, x.val)
         @test eq_type(D(y) ~ 0) == (:diffeq, y.val)

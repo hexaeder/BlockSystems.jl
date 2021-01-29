@@ -30,7 +30,7 @@ end
         using IOSystems: remove_superfluous_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs = [D(x) ~ x,
                D(y) ~ y,
                o ~ a^b]
@@ -64,7 +64,7 @@ end
         using IOSystems: remove_algebraic_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
-        @derivatives D'~t
+        D = Differential(t)
         # variable o can be removed
         eqs = [D(x) ~ x + o,
                D(y) ~ y + o,
@@ -143,7 +143,7 @@ end
         # same system as in testset before
         @parameters t i1(t) i2(t) a b ina(t) inb(t)
         @variables x1(t) x2(t) o(t) add(t)
-        @derivatives D'~t
+        D = Differential(t)
         eqs1  = [D(x1) ~ a*i1, D(x2)~i2, o~x1+x2]
         iob1 = IOBlock(eqs1, [i1, i2], [o], name=:A)
         eqs2  = [D(x1) ~ b*i1, D(x2)~i2, o~x1+x2]
@@ -196,7 +196,7 @@ end
         =#
         @parameters t i(t)
         @variables x(t) o(t)
-        @derivatives D'~t
+        D = Differential(t)
 
         b1 = IOBlock([D(x) ~ i], [i], [x], name=:a)
         b2 = IOBlock([o ~ i], [i], [o], name=:b)

@@ -103,7 +103,7 @@ Construct a new IOBlock for the given arguments.
 using IOSystems, ModelingToolkit
 @parameters t i(t)
 @variables x(t) o(t)
-@derivatives D'~t
+D = Differential(t)
 
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```

@@ -123,7 +123,7 @@ This function checks for cyclic dependencies between algebraic equations by gene
 a dependency graph between them. All substitutions have to be pairwise cycle free.
 ```example
 julia> @variables i x y o1 o2;
-julia> @derivatives D'~t;
+julia> D = Differential(t);
 julia> eqs = [D(x) ~ i,
               o1 ~ x + o2,
               D(y) ~ i,

@@ -20,7 +20,7 @@ where $\sum e$ sums over all the connected edges.
 =#
 @parameters t ω edgesum(t)
 @variables ϕ(t)
-@derivatives D'~t
+D = Differential(t)
 
 kmvert = IOBlock([D(ϕ) ~ ω + edgesum],
                  [edgesum],

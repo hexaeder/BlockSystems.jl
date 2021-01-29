@@ -21,7 +21,7 @@ using IOSystems
 using ModelingToolkit
 @parameters t M F(t)
 @variables x(t) v(t)
-@derivatives D'~t
+D = Differential(t)
 
 spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
                      [F], # inputs of the system
