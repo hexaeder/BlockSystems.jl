@@ -131,7 +131,7 @@ end
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
     for (i, eq) in enumerate(eqs)
-        if eq.lhs isa Term && eq.lhs.op isa Differential
+        if eq.lhs isa Term && operation(eq.lhs) isa Differential
             continue
         end
         eqs[i] = 0 ~ eq.rhs - eq.lhs
@@ -157,7 +157,7 @@ end
 function generate_massmatrix(eqs::AbstractVector{Equation})
     V = Vector{Int}(undef, length(eqs))
     for i in 1:length(eqs)
-        if eqs[i].lhs isa Term && eqs[i].lhs.op isa Differential
+        if eqs[i].lhs isa Term && operation(eqs[i].lhs) isa Differential
             V[i] = 1
         elseif isequal(eqs[i].lhs, 0)
             V[i] = 0

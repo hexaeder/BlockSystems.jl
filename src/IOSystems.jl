@@ -6,7 +6,7 @@ using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
 using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
-using SymbolicUtils: Symbolic
+using SymbolicUtils: Symbolic, operation
 using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem, independent_variable

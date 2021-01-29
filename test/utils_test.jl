@@ -3,6 +3,7 @@ using IOSystems
 using ModelingToolkit
 using ModelingToolkit: value
 using SymbolicUtils
+using SymbolicUtils: operation
 
 @info "Tests of utils.jl"
 
@@ -24,7 +25,7 @@ using SymbolicUtils
         a = to_symbolic(a)
         b = to_symbolic(b)
         an = rename(a, renamespace(:ns, a.name))
-        bn = rename(b, renamespace(:ns, b.op.name))
+        bn = rename(b, renamespace(:ns, operation(b).name))
         @test remove_namespace(:ns, :ns₊n) == :n
         @test remove_namespace("ns", "ns₊n") == "n"
         @test isequal(remove_namespace(:ns, an), a)
