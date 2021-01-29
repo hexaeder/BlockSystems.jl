@@ -121,12 +121,13 @@ using LightGraphs
     @testset "iosystem asserts" begin
         @parameters t i(t)
         @variables o(t)
-        iob1 = IOBlock([o~i],[i],[o],name=:name)
-        iob2 = IOBlock([o~i],[i],[o],name=:name)
+        iob1 = IOBlock([o ~ i],[i],[o],name=:name)
+        iob2 = IOBlock([o ~ i],[i],[o],name=:name)
 
         # namespace collision
         @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2])
-        iob2 = IOBlock([o~i],[i],[o])
+
+        iob2 = IOBlock([o ~ i],[i],[o])
         # mulitiple conneections to same input
         @test_throws ArgumentError IOSystem([iob1.i=>iob1.o, iob1.i=>iob2.o], [iob1, iob2])
         # make sure that alle of form input => output
@@ -137,7 +138,7 @@ using LightGraphs
         @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
                                             namespace_map = [iob2.i => i])
         # assert that rhs of input map is unique
-        iob3 = IOBlock([o~i],[i],[o])
+        iob3 = IOBlock([o ~ i],[i],[o])
         @test_throws ArgumentError IOSystem([iob2.i=>iob1.o],
                                              [iob1, iob2, iob3],
                                              namespace_map = [iob1.i => i, iob3.i => i])
