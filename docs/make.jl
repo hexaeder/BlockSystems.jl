@@ -38,5 +38,6 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/hexaeder/IOSystems_prototype",
-    devbranch="main"
+    devbranch="main",
+    push_preview=true,
 )
