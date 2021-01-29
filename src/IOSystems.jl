@@ -191,10 +191,10 @@ function IOSystem(cons,
                   autopromote = true
                   )
     namespaces = [sys.name for sys in io_systems]
-    @check allunique(namespaces) "Namespace collision in subsystems!"
+    allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
 
     ivs = unique([independent_variable(sys) for sys in io_systems])
-    @check length(ivs) == 1 "Multiple independent variables!"
+    length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
 
     @check allunique(first.(cons)) "Multiple connections to same input!"
     nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)

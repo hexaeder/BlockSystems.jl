@@ -34,29 +34,29 @@ end
         eqs = [D(x) ~ x,
                D(y) ~ y,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, t, [x])
         @test reqs == eqs[[1]]
-        reqs = remove_superfluous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, t, [y])
         @test reqs == eqs[[2]]
-        reqs = remove_superfluous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, t, [o])
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ y,
                D(y) ~ x+o,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, t, [y])
         @test reqs == eqs
-        reqs = remove_superfluous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, t, [x])
         @test reqs == eqs
-        reqs = remove_superfluous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, t, [o])
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ x+o,
                D(y) ~ y,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, [x])
+        reqs = remove_superfluous_states(eqs, t, [x])
         @test reqs == eqs[[1,3]]
-        reqs = remove_superfluous_states(eqs, [y])
+        reqs = remove_superfluous_states(eqs, t, [y])
         @test reqs == eqs[[2]]
-        reqs = remove_superfluous_states(eqs, [o])
+        reqs = remove_superfluous_states(eqs, t, [o])
         @test reqs == eqs[[3]]
     end
 
@@ -144,20 +144,21 @@ end
         @parameters t i1(t) i2(t) a b ina(t) inb(t)
         @variables x1(t) x2(t) o(t) add(t)
         @derivatives D'~t
-        eqs1  = [D(x1)~a*i1, D(x2)~i2, o~x1+x2]
+        eqs1  = [D(x1) ~ a*i1, D(x2)~i2, o~x1+x2]
         iob1 = IOBlock(eqs1, [i1, i2], [o], name=:A)
-        eqs2  = [D(x1)~b*i1, D(x2)~i2, o~x1+x2]
+        eqs2  = [D(x1) ~ b*i1, D(x2)~i2, o~x1+x2]
         iob2 = IOBlock(eqs2, [i1, i2], [o], name=:B)
         ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
         @parameters in1(t) in2(t) in3(t) in4(t)
         @variables out(t)
         sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
                        [iob1, iob2, ioadd],
-                       inputs_map = Dict(iob1.i1 => in1,
-                                         iob1.i2 => in2,
-                                         iob2.i1 => in3,
-                                         iob2.i2 => in4),
-                       outputs_map = Dict(ioadd.add => out),
+                       namespace_map = Dict(iob1.i1 => in1,
+                                            iob1.i2 => in2,
+                                            iob2.i1 => in3,
+                                            iob2.i2 => in4,
+                                            ioadd.add => out),
+                       outputs = [out],
                        name=:sys)
         iob = connect_system(sys)
 
@@ -200,7 +201,8 @@ end
         b1 = IOBlock([D(x) ~ i], [i], [x], name=:a)
         b2 = IOBlock([o ~ i], [i], [o], name=:b)
         subsys = IOSystem([b1.i=>b2.o, b2.i=>b1.x], [b1, b2], name=:A,
-                          outputs_map = [b1.x=>x])
+                          namespace_map = [b1.x=>x],
+                          outputs = [x])
         @test Set(subsys.removed_states) == Set()
 
         subsysA = connect_system(subsys)
