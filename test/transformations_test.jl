@@ -225,7 +225,7 @@ end
 
         @test Set(system.removed_states) == Set([subsysA.o, subsysB.o])
 
-        systemblock = connect_system(system, verbose=true)
+        systemblock = connect_system(system)
         @test systemblock.system.name == systemblock.name == system.name
         @test Set(systemblock.removed_states) == Set(system.removed_states)
 

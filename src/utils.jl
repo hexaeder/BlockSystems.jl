@@ -2,17 +2,18 @@
    check(cond, msg)
 
 If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
-TODO: Proper Output
 """
 macro check(cond::Expr, msg)
-    variables = ()
-    for a in cond.args[2:end]
-        if a isa Expr || a isa Symbol
-            variables = (esc(a), variables...)
-        end
+    head = lstrip(repr(cond), ':')
+    head = head * " == false"
+    args = ()
+    for (i,a) in enumerate(cond.args[2:end])
+        lhs = lstrip(repr(a), ':')
+        symbol = (i == length(cond.args)-1) ? "└ " : "├ "
+        args  = (args..., :("\n   " * $symbol * $lhs * " = " * repr($(esc(a)))))
     end
-    print = :(@show($(repr(cond)),$(variables...)))
-    return :(if !$(esc(cond)); $print; throw(ArgumentError($msg)) end)
+    return :($(esc(cond)) ||
+             throw(ArgumentError($msg * "\n  " * $head * $(args...))))
 end
 
 """

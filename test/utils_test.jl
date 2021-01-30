@@ -1,5 +1,6 @@
 using Test
 using IOSystems
+using IOSystems: @check
 using ModelingToolkit
 using ModelingToolkit: value
 using SymbolicUtils
@@ -10,9 +11,9 @@ using SymbolicUtils: operation
 @testset "utils.jl" begin
     @testset "check macro" begin
         @variables a b c d
-        IOSystems.@check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset"
+        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset"
         try
-            IOSystems.@check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
         catch e
             @test e isa ArgumentError
         end
