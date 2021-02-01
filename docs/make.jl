@@ -21,11 +21,11 @@ end
 makedocs(;
     modules=[BlockSystems],
     authors="Hans Würfel <git@wuerfel.io> and contributors",
-    repo="https://github.com/hexaeder/IOSystems.jl/blob/{commit}{path}#L{line}",
+    repo="https://github.com/hexaeder/BlockSystems.jl/blob/{commit}{path}#L{line}",
     sitename="BlockSystems.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://hexaeder.github.io/IOSystems.jl",
+        canonical="https://hexaeder.github.io/BlockSystems.jl",
         assets=String[],
     ),
     pages=[
@@ -37,7 +37,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/hexaeder/IOSystems_prototype",
+    repo="github.com/hexaeder/BlockSystems.jl",
     devbranch="main",
     push_preview=true,
 )

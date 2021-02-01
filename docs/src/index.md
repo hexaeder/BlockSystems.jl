@@ -2,7 +2,7 @@
 CurrentModule = BlockSystems
 ```
 
-# IOSystems
+# BlockSystems
 ## Basics
 An input-output-system is characterized by a set of equations. These equations can be
 either first order ODEs or explicit algebraic equations.
