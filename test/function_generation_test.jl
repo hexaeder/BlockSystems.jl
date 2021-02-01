@@ -1,5 +1,5 @@
 using Test
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 using LinearAlgebra
 
@@ -7,7 +7,7 @@ using LinearAlgebra
 
 @testset "function_generation.jl" begin
     @testset "transform algebraic equations" begin
-        using IOSystems: transform_algebraic_equations
+        using BlockSystems: transform_algebraic_equations
         @parameters t a b
         @variables x(t) y(t)
         D = Differential(t)
@@ -23,7 +23,7 @@ using LinearAlgebra
     end
 
     @testset "reorder of equations" begin
-        using IOSystems: reorder_by_states
+        using BlockSystems: reorder_by_states
         @parameters t
         @variables x(t) y(t) a(t) b(t)
         D = Differential(t)
@@ -58,7 +58,7 @@ using LinearAlgebra
     end
 
     @testset "generate_massmatrix" begin
-        using IOSystems: generate_massmatrix
+        using BlockSystems: generate_massmatrix
         @parameters t
         @variables x(t) y(t) a(t) b(t)
         D = Differential(t)
@@ -70,7 +70,7 @@ using LinearAlgebra
     end
 
     @testset "all_static" begin
-        using IOSystems: all_static
+        using BlockSystems: all_static
         @parameters t a b i1(t) i2(t)
         @variables o1(t) o2(t)
         D = Differential(t)

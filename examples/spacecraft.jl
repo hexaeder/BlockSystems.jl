@@ -17,7 +17,7 @@ F(t) --| spacecraft |-- x(t)
 ```
 =#
 
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 @parameters t M F(t)
 @variables x(t) v(t)

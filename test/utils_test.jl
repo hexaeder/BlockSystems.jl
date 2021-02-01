@@ -1,6 +1,6 @@
 using Test
-using IOSystems
-using IOSystems: @check
+using BlockSystems
+using BlockSystems: @check
 using ModelingToolkit
 using ModelingToolkit: value
 using SymbolicUtils
@@ -20,7 +20,7 @@ using SymbolicUtils: operation
     end
 
     @testset "remove namespace of symbols" begin
-        using IOSystems: remove_namespace
+        using BlockSystems: remove_namespace
         using ModelingToolkit: renamespace, to_symbolic, rename
         @parameters t a b(t)
         a = to_symbolic(a)
@@ -45,7 +45,7 @@ using SymbolicUtils: operation
     end
 
     @testset "eqsubstitute" begin
-        using IOSystems: eqsubstitute
+        using BlockSystems: eqsubstitute
         @parameters t p i(t) pn inew(t)
         @variables x(t) y xn(t) yn(t)
         D = Differential(t)
@@ -57,7 +57,7 @@ using SymbolicUtils: operation
     end
 
     @testset "test uniquenames" begin
-        using IOSystems: uniquenames
+        using BlockSystems: uniquenames
 
         (t, a, b, mp) = value.(@parameters t a b(t) m)
         (x, y, mv) = value.(@variables x y(t) m)
@@ -66,8 +66,8 @@ using SymbolicUtils: operation
     end
 
     @testset "equation type" begin
-        using IOSystems
-        using IOSystems: eq_type
+        using BlockSystems
+        using BlockSystems: eq_type
         @parameters t
         @variables x(t) y
         D = Differential(t)
@@ -84,7 +84,7 @@ using SymbolicUtils: operation
     end
 
     @testset "recusive subsitute" begin
-        using IOSystems: recursive_substitute
+        using BlockSystems: recursive_substitute
         @syms a b c
         rules = Dict([a=>b+2, b=>c])
         @test isequal(recursive_substitute(a, rules), c+2)

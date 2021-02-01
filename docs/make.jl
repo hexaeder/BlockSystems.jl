@@ -1,4 +1,4 @@
-using IOSystems
+using BlockSystems
 using Documenter
 using Literate
 
@@ -19,10 +19,10 @@ for ex in examples
 end
 
 makedocs(;
-    modules=[IOSystems],
+    modules=[BlockSystems],
     authors="Hans Würfel <git@wuerfel.io> and contributors",
     repo="https://github.com/hexaeder/IOSystems.jl/blob/{commit}{path}#L{line}",
-    sitename="IOSystems.jl",
+    sitename="BlockSystems.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://hexaeder.github.io/IOSystems.jl",

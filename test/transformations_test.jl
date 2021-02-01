@@ -1,5 +1,5 @@
 using Test
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 using LightGraphs
 
@@ -13,7 +13,7 @@ end
 
 @testset "transformations.jl" begin
     @testset "pairwise cycle free" begin
-        using IOSystems: pairwise_cycle_free
+        using BlockSystems: pairwise_cycle_free
         g = SimpleDiGraph(5)
         add_edge!(g, 1=>2)
         add_edge!(g, 2=>4)
@@ -27,7 +27,7 @@ end
     end
 
     @testset "remove superfluous states" begin
-        using IOSystems: remove_superfluous_states
+        using BlockSystems: remove_superfluous_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
         D = Differential(t)
@@ -61,7 +61,7 @@ end
     end
 
     @testset "remove algebraic states" begin
-        using IOSystems: remove_algebraic_states
+        using BlockSystems: remove_algebraic_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
         D = Differential(t)
@@ -229,7 +229,7 @@ end
         @test systemblock.system.name == systemblock.name == system.name
         @test Set(systemblock.removed_states) == Set(system.removed_states)
 
-        using IOSystems: namespace_rem_eqs
+        using BlockSystems: namespace_rem_eqs
         @test systemblock.removed_eqs == vcat(namespace_rem_eqs(subsysA), namespace_rem_eqs(subsysB))
 
         # psst, i'm putting a test for function_generation here, don't tell ma

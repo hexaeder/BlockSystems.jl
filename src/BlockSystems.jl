@@ -1,4 +1,4 @@
-module IOSystems
+module BlockSystems
 
 using LinearAlgebra
 using DocStringExtensions
@@ -100,7 +100,7 @@ $(SIGNATURES)
 Construct a new IOBlock for the given arguments.
 
 ```@example
-using IOSystems, ModelingToolkit
+using BlockSystems, ModelingToolkit
 @parameters t i(t)
 @variables x(t) o(t)
 D = Differential(t)

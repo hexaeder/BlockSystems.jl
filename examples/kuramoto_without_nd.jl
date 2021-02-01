@@ -5,7 +5,7 @@ But this time without `NetworkDynamics.jl` ...
 =#
 
 using LightGraphs
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 using DifferentialEquations
 using Plots

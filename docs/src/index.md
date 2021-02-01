@@ -1,5 +1,5 @@
 ```@meta
-CurrentModule = IOSystems
+CurrentModule = BlockSystems
 ```
 
 # IOSystems
@@ -26,7 +26,7 @@ the states change). Parameters are externally given. For IO systems we define su
   - inputs (`inputs`) which can be connected to the outputs of other systems.
   
 ## Types
-The base type for the IOSystems is `AbstractIOSystem` with the has two concrete implementations. 
+The base type for the BlockSystems is `AbstractIOSystem` with the has two concrete implementations. 
 ```@docs
 AbstractIOSystem
 ```

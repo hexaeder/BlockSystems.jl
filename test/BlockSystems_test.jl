@@ -1,22 +1,22 @@
 using Test
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 using ModelingToolkit: vars, value
 using LightGraphs
 
-@info "Testes of IOSystems.jl"
+@info "Tests of BlockSystems.jl"
 
-@testset "IOSystems.jl" begin
+@testset "BlockSystems.jl" begin
     @testset "namespaced accessors" begin
         @parameters t i1(t) i2(t) a
         @variables x1(t) x2(t) o1(t) o2(t)
         D = Differential(t)
         eqs  = [D(x1) ~ a*i1, o1~i1, D(x2) ~ i2, o2~i2]
         iob = IOBlock(eqs, [i1, i2], [o1, o2], name=:ns)
-        @test Set(IOSystems.namespace_inputs(iob)) == Set([iob.i1, iob.i2])
-        @test Set(IOSystems.namespace_outputs(iob)) == Set([iob.o1, iob.o2])
-        @test Set(IOSystems.namespace_istates(iob)) == Set([iob.x1, iob.x2])
-        @test Set(IOSystems.namespace_iparams(iob)) == Set([iob.a])
+        @test Set(BlockSystems.namespace_inputs(iob)) == Set([iob.i1, iob.i2])
+        @test Set(BlockSystems.namespace_outputs(iob)) == Set([iob.o1, iob.o2])
+        @test Set(BlockSystems.namespace_istates(iob)) == Set([iob.x1, iob.x2])
+        @test Set(BlockSystems.namespace_iparams(iob)) == Set([iob.a])
     end
 
     @testset "creation of IOBlocks" begin
@@ -47,7 +47,7 @@ using LightGraphs
 
     @testset "test of create_namespace_promotions" begin
         using ModelingToolkit: value
-        using IOSystems: create_namespace_promotions
+        using BlockSystems: create_namespace_promotions
         @parameters t
         Aa, Ba, Ab, Bc = value.(@parameters A₊a B₊a(t) A₊b B₊c)
         Ax, Bx, Ay, Bz = value.(@variables A₊x(t) B₊x(t) A₊y(t) B₊z(t))
@@ -165,7 +165,7 @@ using LightGraphs
         eqs = vcat([ModelingToolkit.namespace_equations(iob.system) for iob in ios.systems]...)
         allvars = [(vars(eq.lhs) ∪ vars(eq.rhs)) for eq in eqs]
         allvars = union(allvars...) |> unique
-        allvars = setdiff(allvars, [IOSystems.independent_variable(ios)])
+        allvars = setdiff(allvars, [BlockSystems.independent_variable(ios)])
         allkeys = keys(ios.namespace_map)
         @test isempty(Set(allkeys) ∩ Set(keys(ios.connections)))
         allkeys = Set(allkeys) ∪ Set(keys(ios.connections))

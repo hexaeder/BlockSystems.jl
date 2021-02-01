@@ -5,7 +5,7 @@ In this example we model a Network based on the [Kuroamoto model](https://en.wik
 
 using NetworkDynamics
 using LightGraphs
-using IOSystems
+using BlockSystems
 using ModelingToolkit
 using DifferentialEquations
 using Plots
@@ -36,7 +36,7 @@ end
 
 ## allocation free oop aggregator. might be more difficult for more-dimensional systems
 ## unfortunately there are no vector variables in MDK and we can't model the aggregators
-## as IOSystems.
+## as an IOSystem.
 function sumedges(edges)
     r = 0.0
     for e in edges
