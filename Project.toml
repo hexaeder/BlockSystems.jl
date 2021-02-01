@@ -8,6 +8,8 @@ DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+NetworkDynamics = "22e9dc34-2a0d-11e9-0de0-8588d035468b"
+PowerDynamics = "cc46b21f-1b17-51c2-b642-af74c3d3a8be"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [compat]
