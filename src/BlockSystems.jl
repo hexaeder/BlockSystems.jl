@@ -91,7 +91,7 @@ independent_variable(block::IOBlock) = block.system.iv
 function namespace_rem_eqs(iob::IOBlock)
     eqs = iob.removed_eqs
     isempty(eqs) && return Equation[]
-    map(eq->namespace_equation(eq, iob.name, independent_variable(iob).name), eqs)
+    map(eq->namespace_equation(eq, iob.name, independent_variable(iob)), eqs)
 end
 
 """

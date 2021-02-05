@@ -21,10 +21,10 @@ using SymbolicUtils: operation
 
     @testset "remove namespace of symbols" begin
         using BlockSystems: remove_namespace
-        using ModelingToolkit: renamespace, to_symbolic, rename
+        using ModelingToolkit: renamespace, rename
         @parameters t a b(t)
-        a = to_symbolic(a)
-        b = to_symbolic(b)
+        a = value(a)
+        b = value(b)
         an = rename(a, renamespace(:ns, a.name))
         bn = rename(b, renamespace(:ns, operation(b).name))
         @test remove_namespace(:ns, :ns₊n) == :n
