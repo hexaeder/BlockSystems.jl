@@ -7,7 +7,7 @@ But this time without `NetworkDynamics.jl` ...
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
-using DifferentialEquations
+using OrdinaryDiffEq
 using Plots
 
 #=
@@ -128,5 +128,5 @@ nothing #hide
 # ... and solve the system!
 tspan = (0., 10.)
 prob = ODEProblem(odefun, x0, tspan, p)
-sol = solve(prob)
+sol = solve(prob, Tsit5())
 plot(sol, ylabel="ϕ")
