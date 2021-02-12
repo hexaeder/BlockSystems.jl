@@ -9,10 +9,10 @@ The spacecraft has mass ``m`` and can be controlled with thrusters which apply t
 in our model this system has the input ``F(t)``, the internal state ``v(t)`` (vertical velocity) and the output ``x(t)``.
 
 ```
-       *------------*
+       +------------+
 F(t) --| spacecraft |-- x(t)
        | m, v(t)    |
-       *------------*
+       +------------+
 
 ```
 =#
@@ -37,9 +37,9 @@ A proportional controller takes an input `i` and calculates the output proportio
  o(t) = K\cdot i(t)
 ```
 ```
-       *--------*
+       +--------+
 i(t) --| prop K |-- o(t)
-       *--------*
+       +--------+
 ```
 =#
 @parameters K i(t)
@@ -55,10 +55,10 @@ as an IOSystem where
 Δ = p - m\,.
 ```
 ```
-       *--------*
+       +--------+
 p(t) --|  diff  |-- Δ(t)
 m(t) --|        |
-       *--------*
+       +--------+
 ```
 =#
 @parameters p(t) m(t)
@@ -69,13 +69,13 @@ nothing # hide
 Now we can connect both of the defined models to create an proportional controller
 
 ```
-             *----------------------------------------*
+             +----------------------------------------+
              | propc                                  |
-             |         *--------*   *--------*        |
+             |         +--------+   +--------+        |
   target(t)--|--p(t) --|  diff  |---| prop K |--o(t)--|--o(t)
-feedback(t)--|--m(t) --|        |   *--------*        |
-             |         *--------*                     |
-             *----------------------------------------*
+feedback(t)--|--m(t) --|        |   +--------+        |
+             |         +--------+                     |
+             +----------------------------------------+
 ```
 
 If we don't provide additional information the system will try to promote all of the enclosed
@@ -108,10 +108,10 @@ Right now, the created object is a container for the two included systems. Howev
 it is possible to transform the object into a new `IOBlock` by calling the `connect_system`
 function. The resulting is equivalent to
 ```
-             *----------------------------------*
+             +----------------------------------+
   target(t)--| prop_c_block                     |--o(t)
 feedback(t)--| o(t)=K*(target(t) - feedback(t)) |
-             *----------------------------------*
+             +----------------------------------+
 ```
 =#
 prop_c_block = connect_system(prop_c)
@@ -123,14 +123,14 @@ connected `IOBlock` version `prop_c` or the `IOSystem` version `prop_c_block`. W
 the connected system
 
 ```
-           *--------------------------------------------*
+           +--------------------------------------------+
            |  control system                            |
-           |       *--------*   *------------*          |
-target(t)--|-------| prop_c |---| spacecraft |-x(t)--*--|--altitude(t)
-           |  *-fb-|        |   | m, v(t)    |       |  |
-           |  |    *--------*   *------------*       |  |
-           |  *--------------------------------------*  |
-           *--------------------------------------------*
+           |       +--------+   +------------+          |
+target(t)--|-------| prop_c |---| spacecraft |-x(t)--+--|--altitude(t)
+           |  +-fb-|        |   | m, v(t)    |       |  |
+           |  |    +--------+   +------------+       |  |
+           |  +--------------------------------------+  |
+           +--------------------------------------------+
 ```
 =#
 @variables altitude(t)
@@ -190,18 +190,18 @@ Well who could have thought, proportional control looks like an harmonic oscilla
 We might just add a damping term (a force proportional to the velocity of the spaceship).
 If it works for a harmonic oscillator, it should work for our spaceship.
 ```
-           *--------------------------------------------------------*
+           +--------------------------------------------------------+
            |  control system                                        |
-           |  *--------------------------------------------------*  |
-           |  |    *--------*     *---*                          |  |
-           |  *-v--| prop_v |-(-)-| d |     *------------*       |  |
-           |       *--------*     | i |--F--| spacecraft |-v(t)--*  |
-           |       *--------*     | f |     | m          |-x(t)--*--|--altitude(t)
-target(t)--|-------| prop_c |-(+)-| f |     *------------*       |  |
-           |  *-fb-|        |     *---*                          |  |
-           |  |    *--------*                                    |  |
-           |  *--------------------------------------------------*  |
-           *--------------------------------------------------------*
+           |  +--------------------------------------------------+  |
+           |  |    +--------+     +---+                          |  |
+           |  +-v--| prop_v |-(-)-| d |     +------------+       |  |
+           |       +--------+     | i |--F--| spacecraft |-v(t)--+  |
+           |       +--------+     | f |     | m          |-x(t)--+--|--altitude(t)
+target(t)--|-------| prop_c |-(+)-| f |     +------------+       |  |
+           |  +-fb-|        |     +---+                          |  |
+           |  |    +--------+                                    |  |
+           |  +--------------------------------------------------+  |
+           +--------------------------------------------------------+
 ```
 In order to do so we have to slightly redefine the spaceship system: now the velocity `v(t)` is also an output and not and internal state.
 =#
@@ -239,14 +239,14 @@ plot!(t->targetfun(t),tspan..., label="target")
 #=
 ## Defining an PT1 controller
 ```
-             *-----------------------------------------------*
-             | pi_c                                   *---*  |
-             |                           *------------|   |  |
-             |        *----*  *--------* | *-------*  |sum|--|--o(t)
-  target(t)--|--p(t)--|diff|--| prop K |-*-| int T |--|   |  |
-feedback(t)--|--m(t)--|    |  *--------*   *-------*  *---*  |
-             |        *----*                                 |
-             *-----------------------------------------------*
+             +-----------------------------------------------+
+             | pi_c                                   +---+  |
+             |                           +------------|   |  |
+             |        +----+  +--------+ | +-------+  |sum|--|--o(t)
+  target(t)--|--p(t)--|diff|--| prop K |-+-| int T |--|   |  |
+feedback(t)--|--m(t)--|    |  +--------+   +-------+  +---+  |
+             |        +----+                                 |
+             +-----------------------------------------------+
 ```
 =#
 

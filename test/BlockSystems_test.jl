@@ -175,14 +175,14 @@ using LightGraphs
 
     @testset "test creation of systems" begin
         #=
-                    *------------*
+                    +------------+
         in1 --> i1 -|    iob1    |
-        in2 --> i2 -|(x1, x2)(a) |-o--*     *-----*
-                    *------------*    *-ina-| add |- add ---> out
-                    *------------*    *-inb-|     |
-        in3 --> i1 -|    iob2    |-o--*     *-----*
+        in2 --> i2 -|(x1, x2)(a) |-o--+     +-----+
+                    +------------+    +-ina-| add |- add ---> out
+                    +------------+    +-inb-|     |
+        in3 --> i1 -|    iob2    |-o--+     +-----+
         in4 --> i2 -|(x1, x2)(b) |
-                    *------------*
+                    +------------+
         =#
         @parameters t i1(t) i2(t) a b ina(t) inb(t)
         @variables x1(t) x2(t) o(t) add(t)

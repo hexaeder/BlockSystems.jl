@@ -131,14 +131,14 @@ end
 
     @testset "test of connect_system" begin
         #=
-                    *------------*
+                    +------------+
         in1 --> i1 -|    iob1    |
-        in2 --> i2 -|(x1, x2)(a) |-o--*     *-----*
-                    *------------*    *-ina-| add |- add ---> out
-                    *------------*    *-inb-|     |
-        in3 --> i1 -|    iob2    |-o--*     *-----*
+        in2 --> i2 -|(x1, x2)(a) |-o--+     +-----+
+                    +------------+    +-ina-| add |- add ---> out
+                    +------------+    +-inb-|     |
+        in3 --> i1 -|    iob2    |-o--+     +-----+
         in4 --> i2 -|(x1, x2)(b) |
-                    *------------*
+                    +------------+
         =#
         # same system as in testset before
         @parameters t i1(t) i2(t) a b ina(t) inb(t)
