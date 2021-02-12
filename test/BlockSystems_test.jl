@@ -236,7 +236,7 @@ using LightGraphs
                                             iob2.x1 => :x1,
                                             iob2.x2 => :x2,
                                             ioadd.add => :out),
-                       outputs = [ioadd.add],
+                       outputs = [:out],
                        name=:sys)
         @test Set(sys1.inputs) == Set([in1, in2, in3, in4])
         @test Set(sys1.iparams) == Set([p1, p2])

@@ -189,8 +189,7 @@ function IOSystem(cons,
                   namespace_map = nothing,
                   outputs = :all,
                   name = gensym(:IOSystem),
-                  autopromote = true
-                  )
+                  autopromote = true)
     namespaces = [sys.name for sys in io_systems]
     allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
 
@@ -218,12 +217,17 @@ function IOSystem(cons,
 
     # if the user provided a list of outputs, all other outputs become istates
     if outputs != :all
-        outputs = value.(outputs)
+        outputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
         # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
         for (i, o) in enumerate(outputs)
             if o ∉ Set(nspcd_outputs)
-                key = findfirst(v->isequal(v, o), namespace_map)
-                key∉Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
+                if o isa Symbol
+                    key = findfirst(v->isequal(getname(v), o), namespace_map)
+                else
+                    key = findfirst(v->isequal(v, o), namespace_map)
+                end
+                # check if key references a output (namespace_map contains all)
+                key ∉ Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
                 outputs[i] = key
             end
         end
