@@ -91,17 +91,20 @@ prop_c = IOSystem([prop.i => diff.Δ], # connect input of prop to output of diff
 @info "namespace mapping" prop_c.namespace_map
 
 #=
-For finer control, it is often preferred to give new names manually, this is done with the
-`namespace_map` argument. Per default, all of the outputs of the subsystems will become outputs
-of the connected system (in this case also the output `diff.Δ`). We can prevent this by supplying
-the `outputs` argument manually. Sub outputs which are not referenced here will become internal
-states of the connected system.
+For finer control, it is often preferred to give new names manually, this is
+done with the `namespace_map` argument. Per default, all of the outputs of the
+subsystems will become outputs of the connected system (in this case also the
+output `diff.Δ`). We can prevent this by supplying the `outputs` argument
+manually. Sub outputs which are not referenced here will become internal states
+of the connected system.
+
+The rhs of the namespace map can be given as a Variable/Parameter type from MTK.
+For simple renaming one can also give the rhs as a `Symbol` type.
 =#
-@parameters target(t) feedback(t)
 prop_c = IOSystem([prop.i => diff.Δ], [diff, prop],
                   namespace_map = [prop.o => o,
-                                   diff.p => target,
-                                   diff.m => feedback],
+                                   diff.p => :target,
+                                   diff.m => :feedback],
                   outputs = [o],
                   name=:propc)
 @info "namespace mapping" prop_c.namespace_map
@@ -263,8 +266,8 @@ pi_c = IOSystem([prop.i => diff.Δ,
                  adder.a1 => prop.o,
                  adder.a2 => int.o],
                 [diff, prop, int, adder],
-                namespace_map = [diff.p => target,
-                                 diff.m => feedback,
+                namespace_map = [diff.p => :target,
+                                 diff.m => :feedback,
                                  adder.Σ => o],
                 outputs = [o],
                 name=:pi_c)
