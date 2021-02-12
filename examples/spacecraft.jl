@@ -175,14 +175,14 @@ nothing # hide
 Well, let's see how our model is doing.
 =#
 using Plots
-using DifferentialEquations
+using OrdinaryDiffEq
 targetfun(t) = t>1.0 ? 1.0 : 0
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
 p = [0.5, 1.0] # K, m
 u0 = [0.0, 0.0] # altitude, v
 tspan = (0.0, 30.0)
 prob = ODEProblem(odefun, u0, tspan, p)
-sol = solve(prob)
+sol = solve(prob, Tsit5())
 plot(t->sol(t)[1],tspan..., label="altitude", title="proportional control")
 plot!(t->targetfun(t),tspan..., label="target")
 
@@ -235,7 +235,7 @@ p = [1.0, 1.0, 0.5] # propc, M, propv
 u0 = [0.0, 0.0] # altitude, v
 tspan = (0.0, 30.0)
 prob = ODEProblem(odefun, u0, tspan, p)
-sol = solve(prob)
+sol = solve(prob, Tsit5())
 plot(sol, vars=(0,1), label="altitude", title="better control")
 plot!(t->targetfun(t),tspan..., label="target")
 
@@ -288,7 +288,7 @@ p = [0.5, -1.5, 1.0] # K, T, m
 u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
 tspan = (0.0, 50.0)
 prob = ODEProblem(odefun, u0, tspan, p)
-sol = solve(prob)
+sol = solve(prob, Tsit5())
 plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PT1 controller")
 plot!(t->targetfun(t),tspan..., label="target")
 

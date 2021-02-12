@@ -7,7 +7,7 @@ using NetworkDynamics
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
-using DifferentialEquations
+using OrdinaryDiffEq
 using Plots
 
 #=
@@ -81,5 +81,5 @@ x0 .-= sum(x0)./N
 
 tspan = (0., 10.)
 prob = ODEProblem(nd, x0, tspan, p)
-sol = solve(prob)
+sol = solve(prob, Tsit5())
 plot(sol, ylabel="ϕ")

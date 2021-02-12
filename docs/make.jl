@@ -1,10 +1,13 @@
-using BlockSystems
 using Documenter
 using Literate
 
+# precompile stuff now so the output won't show up in the docs
+using BlockSystems
 using Plots
-using DifferentialEquations
+using OrdinaryDiffEq
 using ModelingToolkit
+using LightGraphs
+using NetworkDynamics
 
 # generate examples
 examples = [
