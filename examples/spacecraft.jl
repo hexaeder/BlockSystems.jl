@@ -27,10 +27,6 @@ spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
                      [F], # inputs of the system
                      [x], # outputs of the system
                      name = :spacecraft)
-@show spacecraft.inputs
-@show spacecraft.outputs
-@show spacecraft.istates
-nothing # hide
 
 #=
 We want to model a controller which takes a desired altitude as an input parameter and outputs the force for thrusters.
@@ -88,7 +84,6 @@ variables to the new systemwide namespace.
 prop_c = IOSystem([prop.i => diff.Δ], # connect input of prop to output of diff
                   [diff, prop], # subsystems
                   name=:propc)
-@info "namespace mapping" prop_c.namespace_map
 
 #=
 For finer control, it is often preferred to give new names manually, this is
@@ -107,7 +102,6 @@ prop_c = IOSystem([prop.i => diff.Δ], [diff, prop],
                                    diff.m => :feedback],
                   outputs = [o],
                   name=:propc)
-@info "namespace mapping" prop_c.namespace_map
 
 #=
 Right now, the created object is a container for the two included systems. However,
@@ -146,7 +140,7 @@ space_controller = IOSystem([spacecraft.F => prop_c.o, prop_c.feedback => spacec
                             outputs = [altitude])
 ## we want to reduce the space_controller to a block
 space_controller = connect_system(space_controller)
-@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
+@info "Variables of space_controller" space_controller space_controller.system.eqs
 
 
 #=
@@ -280,7 +274,7 @@ space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft
                             namespace_map = [spacecraft.x => altitude],
                             outputs = [altitude])
 space_controller = connect_system(space_controller, verbose=false)
-@info "Variables of space_controller" space_controller.inputs space_controller.outputs space_controller.istates space_controller.iparams space_controller.system.eqs
+@info "Variables of space_controller" space_controller space_controller.system.eqs
 
 # and we can simulate and plot the system
 gen = generate_io_function(space_controller, f_states=[altitude], f_params=[K, T, M])
