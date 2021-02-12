@@ -257,6 +257,35 @@ function IOSystem(cons,
              io_systems)
 end
 
+
+export BlockSpec, fulfils
+
+"""
+    BlockSpec
+
+Block specification, defines which inputs/outputs an [`AbsractIOSystem`](@ref) should have.
+Contains two vectors of `Symbols`. Can be initialized with Vectors of `Symbols`, `Num` or `<:Symbolic`.
+
+Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfils specification.
+"""
+struct BlockSpec
+    inputs::Vector{Symbol}
+    outputs::Vector{Symbol}
+end
+BlockSpec(in::Vector{Num}, out::Vector{Num}) = BlockSpec(value.(in), value.(out))
+BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}) = BlockSpec(getname.(in), getname.(out))
+
+(bs::BlockSpec)(io) = fulfils(io, bs)
+
+"""
+    fulfils(io, bs::BlockSpec)::Bool
+
+Check whether `io` fulfils the given [`BlockSpec`](@ref)
+"""
+fulfils(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
+                                Set(bs.outputs) ⊆ Set(getname.(io.outputs))
+
+
 """
     fix_map_types(map)
 

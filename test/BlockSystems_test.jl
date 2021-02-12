@@ -265,4 +265,35 @@ using LightGraphs
                                             outputs = [p1], # provide outputs as namespaced variable
                                             name=:sys)
     end
+
+    @testset "test BlockSpec" begin
+        @parameters t
+        @parameters uᵢ(t) uᵣ(t)
+        @variables x(t) iᵢ(t) iᵣ(t)
+        bs1 = BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])
+        bs2 = BlockSpec(value.([uᵣ, uᵢ]), value.([iᵣ, iᵢ]))
+        bs3 = BlockSpec([uᵣ, uᵢ], [iᵣ, iᵢ])
+        @test bs1.inputs == bs2.inputs == bs3.inputs
+        @test bs1.outputs == bs2.outputs == bs3.outputs
+
+        D = Differential(t)
+        eqs  = [D(x) ~ x, iᵢ ~ uᵢ, iᵣ ~ uᵣ]
+        iob1 = IOBlock(eqs, [uᵢ, uᵣ], [iᵢ, iᵣ])
+        iob2 = IOBlock(eqs, [uᵢ], [iᵢ, iᵣ])
+        iob3 = IOBlock(eqs, [uᵢ, uᵣ], [iᵢ])
+
+        @test fulfils(iob1, bs1) == bs1(iob1) == true
+        @test fulfils(iob2, bs1) == bs1(iob2) == false
+        @test fulfils(iob3, bs1) == bs1(iob3) == false
+
+        sys1 = IOSystem([], [iob1, iob2])
+        sys2 = IOSystem([], [iob1, iob2], outputs=[iᵢ, iᵣ],
+                        namespace_map = [iob1.iᵢ => iᵢ,
+                                         iob1.iᵣ => iᵣ,
+                                         iob1.uᵢ => uᵢ,
+                                         iob1.uᵣ => uᵣ])
+
+        @test bs1(sys1) == false
+        @test bs1(sys2) == true
+    end
 end
