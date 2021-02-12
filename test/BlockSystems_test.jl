@@ -208,7 +208,7 @@ using LightGraphs
         # provide maps
         @parameters in1(t) in2(t) in3(t) in4(t) p1 p2
         @variables out(t) y1(t) y2(t)
-        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys1 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(iob1.i1 => in1,
                                             iob1.i2 => in2,
@@ -223,11 +223,32 @@ using LightGraphs
                                             ioadd.add => out),
                        outputs = [ioadd.add],
                        name=:sys)
-        @test Set(sys.inputs) == Set([in1, in2, in3, in4])
-        @test Set(sys.iparams) == Set([p1, p2])
-        @test Set(sys.istates) == Set([y1, y2, x1, x2, iob1.o, iob2.o])
-        @test Set(sys.outputs) == Set([out])
-        test_complete_namespace_promotions(sys)
+        sys2 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+                       [iob1, iob2, ioadd],
+                       namespace_map = Dict(iob1.i1 => :in1,
+                                            iob1.i2 => :in2,
+                                            iob2.i1 => :in3,
+                                            iob2.i2 => :in4,
+                                            iob1.a => :p1,
+                                            iob2.b => :p2,
+                                            iob1.x1 => :y1,
+                                            iob1.x2 => :y2,
+                                            iob2.x1 => :x1,
+                                            iob2.x2 => :x2,
+                                            ioadd.add => :out),
+                       outputs = [:out],
+                       name=:sys)
+        @test Set(sys1.inputs) == Set([in1, in2, in3, in4])
+        @test Set(sys1.iparams) == Set([p1, p2])
+        @test Set(sys1.istates) == Set([y1, y2, x1, x2, iob1.o, iob2.o])
+        @test Set(sys1.outputs) == Set([out])
+        test_complete_namespace_promotions(sys1)
+
+        @test Set(sys2.inputs) == Set([in1, in2, in3, in4])
+        @test Set(sys2.iparams) == Set([p1, p2])
+        @test Set(sys2.istates) == Set([y1, y2, x1, x2, iob1.o, iob2.o])
+        @test Set(sys2.outputs) == Set([out])
+        test_complete_namespace_promotions(sys2)
 
         # provide partial maps
         sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],

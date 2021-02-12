@@ -172,10 +172,11 @@ Parameters
  - `cons`: the connections in the form `sub2.input => sub2.output`
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
-   i.e. `sub1.input => voltage`. Variables without entry in the map will be
+   i.e. sub1.input => voltage`. Variables without entry in the map will be
    promoted automatically. Automatic promotion means that the sub-namespace is
    removed whenever it is possible without naming conflicts. The map may contain
-   inputs, outputs, istates, iparams and removed_states. TODO: Allow :symbols in rhs.
+   inputs, outputs, istates, iparams and removed_states. The rhs of the map can be provided
+   as as Symbol: `sub1.input => :newname`.
  - `outputs`: Per default, all of the subsystem outputs will become system outputs. However,
    by providing a list of variables as outputs *only these* will become outputs of the
    new system. All other sub-outputs will become internal states of the connected system
@@ -188,8 +189,7 @@ function IOSystem(cons,
                   namespace_map = nothing,
                   outputs = :all,
                   name = gensym(:IOSystem),
-                  autopromote = true
-                  )
+                  autopromote = true)
     namespaces = [sys.name for sys in io_systems]
     allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
 
@@ -217,12 +217,17 @@ function IOSystem(cons,
 
     # if the user provided a list of outputs, all other outputs become istates
     if outputs != :all
-        outputs = value.(outputs)
+        outputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
         # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
         for (i, o) in enumerate(outputs)
             if o ∉ Set(nspcd_outputs)
-                key = findfirst(v->isequal(v, o), namespace_map)
-                key∉Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
+                if o isa Symbol
+                    key = findfirst(v->isequal(getname(v), o), namespace_map)
+                else
+                    key = findfirst(v->isequal(v, o), namespace_map)
+                end
+                # check if key references a output (namespace_map contains all)
+                key ∉ Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
                 outputs[i] = key
             end
         end
@@ -270,7 +275,7 @@ of `Symbols`, `Num` or `<:Symbolic`.
 Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfils
 specification. See also [`fulfils`](@ref).
 
-```example
+```
 iob = IOBlock(...)
 spec = BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])
 fulfils(iob, spec)
@@ -300,13 +305,19 @@ fulfils(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
 
 Creates Dict from `map`. Changes `Num`-types to `Symbolic`-types in the
 user provided maps. Map can be Dict or  Array of Pairs.
+If the rhs is of type `Symbol` it will be converted to a `Symbolic` type.
 """
 function fix_map_types(map)
     dict = Dict(map)
     newdict = Dict{Symbolic, Symbolic}()
     for k in keys(dict)
         newkey = value(k)
-        newdict[newkey] = value(dict[k])
+        if dict[k] isa Symbol
+            newval = rename(newkey, dict[k])
+        else
+            newval = value(dict[k])
+        end
+        newdict[newkey] = newval
     end
     newdict
 end
