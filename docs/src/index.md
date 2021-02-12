@@ -53,3 +53,10 @@ connect_system
 generate_io_function
 ```
 
+## Block specifications
+Sometimes it is useful to define a the input/output structure for a block.
+```@docs
+BlockSpec
+fulfils
+```
+

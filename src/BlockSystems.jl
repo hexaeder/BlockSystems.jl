@@ -261,12 +261,21 @@ end
 export BlockSpec, fulfils
 
 """
-    BlockSpec
+    struct BlockSpec
 
-Block specification, defines which inputs/outputs an [`AbsractIOSystem`](@ref) should have.
-Contains two vectors of `Symbols`. Can be initialized with Vectors of `Symbols`, `Num` or `<:Symbolic`.
+Block specification, defines which inputs/outputs an [`AbstractIOSystem`](@ref)
+should have. Contains two vectors of `Symbols`. Can be initialized with Vectors
+of `Symbols`, `Num` or `<:Symbolic`.
 
-Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfils specification.
+Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfils
+specification. See also [`fulfils`](@ref).
+
+```example
+iob = IOBlock(...)
+spec = BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])
+fulfils(iob, spec)
+spec(iob)
+```
 """
 struct BlockSpec
     inputs::Vector{Symbol}
@@ -280,7 +289,7 @@ BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}) = BlockSpec(getname.(
 """
     fulfils(io, bs::BlockSpec)::Bool
 
-Check whether `io` fulfils the given [`BlockSpec`](@ref)
+Check whether `io` fulfils the given [`BlockSpec`](@ref).
 """
 fulfils(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
                                 Set(bs.outputs) ⊆ Set(getname.(io.outputs))
