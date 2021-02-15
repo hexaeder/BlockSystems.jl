@@ -151,7 +151,7 @@ end
         ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
         @parameters in1(t) in2(t) in3(t) in4(t)
         @variables out(t)
-        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(iob1.i1 => in1,
                                             iob1.i2 => in2,
@@ -200,7 +200,7 @@ end
 
         b1 = IOBlock([D(x) ~ i], [i], [x], name=:a)
         b2 = IOBlock([o ~ i], [i], [o], name=:b)
-        subsys = IOSystem([b1.i=>b2.o, b2.i=>b1.x], [b1, b2], name=:A,
+        subsys = IOSystem([b2.o => b1.i, b1.x => b2.i], [b1, b2], name=:A,
                           namespace_map = [b1.x=>x],
                           outputs = [x])
         @test Set(subsys.removed_states) == Set()
@@ -220,7 +220,7 @@ end
         @parameters a1(t) a2(t)
         adder = IOBlock([o ~ a1 + a2], [a1, a2], [o], name=:add)
 
-        system = IOSystem([adder.a1=>subsysA.x, adder.a2=>subsysB.x],
+        system = IOSystem([subsysA.x => adder.a1, subsysB.x => adder.a2],
                           [adder, subsysA, subsysB])
 
         @test Set(system.removed_states) == Set([subsysA.o, subsysB.o])
