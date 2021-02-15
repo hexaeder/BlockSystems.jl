@@ -57,8 +57,8 @@ nothing #hide
 With the edges we can generate vert blocks based on their number of out and in edges.
 We can also create the connections
 ```
-v1.out_edge₁ => e1to2.src
-v2.in_edge₁ => e1to2.dst
+e1to2.src => v1.out_edge₁
+e1to2.dst => v2.in_edge₁
 ```
 and so forth.
 =#
@@ -73,19 +73,19 @@ for i in vertices(g)
 
     for (i, edge) in enumerate(out_edges)
         input = getproperty(block, Symbol("out_edge", Char(0x02080 + i)))
-        push!(connections, input => edge.block.o)
+        push!(connections, edge.block.o => input)
     end
 
     for (i, edge) in enumerate(in_edges)
         input = getproperty(block, Symbol("in_edge", Char(0x02080 + i)))
-        push!(connections, input => edge.block.o)
+        push!(connections, edge.block.o => input)
     end
 end
 
 # Once the vertices are generated we can plug the edges src and dst to the output of the corresponding vertex.
 for edge in edgelist
-    push!(connections, edge.block.src => vert_blocks[edge.src].ϕ)
-    push!(connections, edge.block.dst => vert_blocks[edge.dst].ϕ)
+    push!(connections, vert_blocks[edge.src].ϕ => edge.block.src)
+    push!(connections, vert_blocks[edge.dst].ϕ => edge.block.dst)
 end
 
 #=
