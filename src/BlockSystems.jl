@@ -196,7 +196,6 @@ function IOSystem(cons,
     ivs = unique([independent_variable(sys) for sys in io_systems])
     length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
 
-    @check allunique(last.(cons)) "Multiple connections to same input!"
     nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
     nspcd_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
     nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
@@ -206,6 +205,8 @@ function IOSystem(cons,
     # check validity of provided connections
     @check Set(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection needs to be output of subsystem."
     @check Set(last.(cons)) ⊆ Set(nspcd_inputs) "Second argument in connection needs to be input of subsystem."
+    @check allunique(last.(cons)) "Multiple connections to same input!"
+
     # reduce the inputs to the open inputs
     open_inputs = setdiff(nspcd_inputs, last.(cons))
 
