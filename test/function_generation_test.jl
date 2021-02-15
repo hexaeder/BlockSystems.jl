@@ -155,5 +155,21 @@ using LinearAlgebra
         @test allequal(gen.params, makesym.([a, b], states=[]))
         gen = generate_io_function(iob, f_params=[b, a])
         @test allequal(gen.params, makesym.([b, a], states=[]))
+
+        # test with Symbols
+        gen = generate_io_function(iob, f_states=[:o1, :o2])
+        @test allequal(gen.states, makesym.([o1, o2], states=[]))
+        gen = generate_io_function(iob, f_states=[:o2, :o1])
+        @test allequal(gen.states, makesym.([o2, o1], states=[]))
+
+        gen = generate_io_function(iob, f_inputs=[:i1, :i2])
+        @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
+        gen = generate_io_function(iob, f_inputs=[:i2, :i1])
+        @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
+
+        gen = generate_io_function(iob, f_params=[a, :b])
+        @test allequal(gen.params, makesym.([a, b], states=[]))
+        gen = generate_io_function(iob, f_params=[:b, a])
+        @test allequal(gen.params, makesym.([b, a], states=[]))
     end
 end

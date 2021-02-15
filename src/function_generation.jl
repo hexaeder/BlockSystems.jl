@@ -40,16 +40,17 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
     end
-    # f_outputs, f_inputs and f_params may be given in namepsace version
-    f_states = remove_namespace.(ios.name, value.(f_states))
-    f_inputs = remove_namespace.(ios.name, value.(f_inputs))
-    f_params = remove_namespace.(ios.name, value.(f_params))
-    f_rem_states = remove_namespace.(ios.name, value.(f_rem_states))
 
-    Set(f_states) ⊆ (Set(ios.outputs) ∪ Set(ios.istates)) || throw(ArgumentError("f_states !⊆ (outputs ∪ istates)"))
-    Set(f_inputs) ⊆ Set(ios.inputs) || throw(ArgumentError("f_inputs !⊆ inputs"))
-    Set(f_params) ⊆ Set(ios.iparams) || throw(ArgumentError("f_params !⊆ iparams"))
-    Set(f_rem_states) ⊆ Set(ios.removed_states) || throw(ArgumentError("f_rem_states !⊆ removed_states"))
+    # f_* may be given in namepsace version or as symbols
+    f_states = prepare_f_vector(ios, f_states)
+    f_inputs = prepare_f_vector(ios, f_inputs)
+    f_params = prepare_f_vector(ios, f_params)
+    f_rem_states = prepare_f_vector(ios, f_rem_states)
+
+    @check Set(f_states) ⊆ (Set(ios.outputs) ∪ Set(ios.istates)) "f_states !⊆ (outputs ∪ istates)"
+    @check Set(f_inputs) ⊆ Set(ios.inputs) "f_inputs !⊆ inputs"
+    @check Set(f_params) ⊆ Set(ios.iparams) "f_params !⊆ iparams"
+    @check Set(f_rem_states) ⊆ Set(ios.removed_states) "f_rem_states !⊆ removed_states"
 
     # enforce ordering of states, inputs and params
     states = vcat(f_states, ios.outputs, ios.istates) |> unique
@@ -126,6 +127,24 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
             params=param_syms,
             g_oop=g_oop, g_ip=g_ip,
             rem_states=rem_state_syms)
+end
+
+"""
+    prepare_f_vector(iob, vector)
+
+Prepare the user given variable lists which should appear first.
+If `Symbol` type is given, it will look up the symbol as in
+`iob.:sym`. The leading namespace of `iob` is removed from all variables
+if it exists.
+Returns new vector of `Symbolic`.
+"""
+function prepare_f_vector(iob::IOBlock, vector)
+    newvec = Vector{Symbolic}(undef, length(vector))
+    for (i, v) in enumerate(vector)
+        sym = v isa Symbol ? getproperty(iob, v) : value(v)
+        newvec[i] = remove_namespace(iob.name, sym)
+    end
+    return newvec
 end
 
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
