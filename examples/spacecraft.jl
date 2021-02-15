@@ -81,7 +81,7 @@ feedback(t)--|--m(t) --|        |   +--------+        |
 If we don't provide additional information the system will try to promote all of the enclosed
 variables to the new systemwide namespace.
 =#
-prop_c = IOSystem([prop.i => diff.Δ], # connect input of prop to output of diff
+prop_c = IOSystem([diff.Δ => prop.i], # connect output of diff to input of prop
                   [diff, prop], # subsystems
                   name=:propc)
 
@@ -96,7 +96,7 @@ of the connected system.
 The rhs of the namespace map can be given as a Variable/Parameter type from MTK.
 For simple renaming one can also give the rhs as a `Symbol` type.
 =#
-prop_c = IOSystem([prop.i => diff.Δ], [diff, prop],
+prop_c = IOSystem([diff.Δ => prop.i], [diff, prop],
                   namespace_map = [prop.o => o,
                                    diff.p => :target,
                                    diff.m => :feedback],
@@ -134,7 +134,7 @@ target(t)--|-------| prop_c |---| spacecraft |-x(t)--+--|--altitude(t)
 ```
 =#
 @variables altitude(t)
-space_controller = IOSystem([spacecraft.F => prop_c.o, prop_c.feedback => spacecraft.x],
+space_controller = IOSystem([prop_c.o => spacecraft.F, spacecraft.x => prop_c.feedback],
                             [prop_c, spacecraft],
                             namespace_map = [spacecraft.x => altitude],
                             outputs = [altitude])
@@ -215,11 +215,11 @@ spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v],
 prop_v = IOBlock(prop, name=:prop_v)
 fdiff = IOBlock(diff, name=:fdiff)
 
-space_controller = IOSystem([prop_v.i => spacecraft.v,
-                             prop_c.feedback => spacecraft.x,
-                             fdiff.p => prop_c.o,
-                             fdiff.m => prop_v.o,
-                             spacecraft.F => fdiff.Δ],
+space_controller = IOSystem([spacecraft.v => prop_v.i,
+                             spacecraft.x => prop_c.feedback,
+                             prop_c.o => fdiff.p,
+                             prop_v.o => fdiff.m,
+                             fdiff.Δ => spacecraft.F],
                             [prop_v, prop_c, fdiff, spacecraft],
                             namespace_map = [spacecraft.x => altitude],
                             outputs = [altitude])
@@ -255,10 +255,10 @@ feedback(t)--|--m(t)--|    |  +--------+   +-------+  +---+  |
 int = IOBlock([D(o) ~ 1/T * i - o], [i], [o], name=:int)
 adder = IOBlock([Σ ~ a1 + a2], [a1, a2], [Σ], name=:add)
 
-pi_c = IOSystem([prop.i => diff.Δ,
-                 int.i => prop.o,
-                 adder.a1 => prop.o,
-                 adder.a2 => int.o],
+pi_c = IOSystem([diff.Δ => prop.i,
+                 prop.o => int.i,
+                 prop.o => adder.a1,
+                 int.o => adder.a2],
                 [diff, prop, int, adder],
                 namespace_map = [diff.p => :target,
                                  diff.m => :feedback,
@@ -269,7 +269,7 @@ nothing # hide
 
 # as before we can close the loop and build the control circuit
 
-space_controller = IOSystem([spacecraft.F => pi_c.o, pi_c.feedback => spacecraft.x],
+space_controller = IOSystem([pi_c.o => spacecraft.F , spacecraft.x => pi_c.feedback],
                             [pi_c, spacecraft],
                             namespace_map = [spacecraft.x => altitude],
                             outputs = [altitude])
@@ -278,7 +278,6 @@ space_controller = connect_system(space_controller, verbose=false)
 
 # and we can simulate and plot the system
 gen = generate_io_function(space_controller, f_states=[altitude], f_params=[K, T, M])
-@info "order of parameters" gen.params
 
 odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
 p = [0.5, -1.5, 1.0] # K, T, m

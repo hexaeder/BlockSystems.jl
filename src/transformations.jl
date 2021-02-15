@@ -28,12 +28,12 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     verbose && @info "Transform IOSystem $(ios.name) to IOBlock" ios.name ios.inputs ios.outputs ios.connections eqs
 
     # get rid of closed inputs by substituting output states
-    connections = ios.connections
+    substitutions = reverse.(ios.connections)
     for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
+        eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
     end
     for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, connections)
+        removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
     end
 
     verbose && @info "substitute inputs with outputs" eqs

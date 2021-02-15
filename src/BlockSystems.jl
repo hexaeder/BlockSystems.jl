@@ -139,7 +139,7 @@ end
 $(TYPEDEF)
 
 A composite `IOSystem` which consists of multiple [`AbstractIOSystem`](@ref) which are connected via
-a vector of namespaced pairs (`subsys1.out1 => subsys2.in1`).
+a vector of namespaced pairs (`subsys1.out => subsys2.in`).
 
 An `IOSystem` contains maps how to promote the namespaced variables of the subsystem to the new scope
    subsys1₊x(t) => x(t)
@@ -155,7 +155,7 @@ struct IOSystem <: AbstractIOSystem
     istates::Vector{Symbolic}
     outputs::Vector{Symbolic}
     removed_states::Vector{Symbolic}
-    connections::Dict{Symbolic, Symbolic}
+    connections::Vector{Pair{Symbolic, Symbolic}}
     namespace_map::Dict{Symbolic, Symbolic}
     systems::Vector{AbstractIOSystem}
 end
@@ -169,7 +169,7 @@ $(SIGNATURES)
 
 Construct a new IOSystem from various subsystems.
 Parameters
- - `cons`: the connections in the form `sub2.input => sub2.output`
+ - `cons`: the connections in the form `sub1.output => sub2.input`
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
    i.e. sub1.input => voltage`. Variables without entry in the map will be
@@ -196,7 +196,6 @@ function IOSystem(cons,
     ivs = unique([independent_variable(sys) for sys in io_systems])
     length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
 
-    @check allunique(first.(cons)) "Multiple connections to same input!"
     nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
     nspcd_iparams = vcat([namespace_iparams(sys) for sys in io_systems]...)
     nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
@@ -204,10 +203,12 @@ function IOSystem(cons,
     nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
 
     # check validity of provided connections
-    @check Set(first.(cons)) ⊆ Set(nspcd_inputs) "First argument in connection needs to be input of subsystem."
-    @check Set(last.(cons)) ⊆ Set(nspcd_outputs) "Second argument in connection needs to be output of subsystem."
+    @check Set(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection needs to be output of subsystem."
+    @check Set(last.(cons)) ⊆ Set(nspcd_inputs) "Second argument in connection needs to be input of subsystem."
+    @check allunique(last.(cons)) "Multiple connections to same input!"
+
     # reduce the inputs to the open inputs
-    open_inputs = setdiff(nspcd_inputs, first.(cons))
+    open_inputs = setdiff(nspcd_inputs, last.(cons))
 
     # check validity of provided namespace maps
     namespace_map = fix_map_types(namespace_map)
@@ -257,7 +258,7 @@ function IOSystem(cons,
 
     IOSystem(name,
              inputs, iparams, istates, outputs, rem_states,
-             Dict(cons),
+             cons,
              namespace_map,
              io_systems)
 end

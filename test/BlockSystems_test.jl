@@ -125,21 +125,21 @@ using LightGraphs
         iob2 = IOBlock([o ~ i],[i],[o],name=:name)
 
         # namespace collision
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2])
 
         iob2 = IOBlock([o ~ i],[i],[o])
         # mulitiple conneections to same input
-        @test_throws ArgumentError IOSystem([iob1.i=>iob1.o, iob1.i=>iob2.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.o => iob1.i, iob2.o => iob1.i], [iob1, iob2])
         # make sure that alle of form input => output
-        @test_throws ArgumentError IOSystem([iob1.o=>iob1.o], [iob1, iob2])
-        @test_throws ArgumentError IOSystem([iob1.i=>iob1.i], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.o => iob1.o], [iob1, iob2])
+        @test_throws ArgumentError IOSystem([iob1.i => iob1.i], [iob1, iob2])
 
         # assert that input maps refere to open inputs
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2],
                                             namespace_map = [iob2.i => i])
         # assert that rhs of input map is unique
         iob3 = IOBlock([o ~ i],[i],[o])
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o],
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i],
                                              [iob1, iob2, iob3],
                                              namespace_map = [iob1.i => i, iob3.i => i])
 
@@ -149,15 +149,15 @@ using LightGraphs
         D = Differential(t)
         iob1 = IOBlock([D(x)~ i, o~a*x], [i], [o], name=:iob1)
         iob2 = IOBlock([D(x)~ i, o~a*x], [i], [o], name=:iob2)
-        IOSystem([iob2.i=>iob1.o], [iob1, iob2])
+        IOSystem([iob1.o => iob2.i], [iob1, iob2])
         # rhs unique
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2],
                                             namespace_map = [iob1.a=>b, iob2.a=>b])
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2],
                                             namespace_map = [iob1.x=>y, iob2.x=>y])
 
         # rhs unique
-        @test_throws ArgumentError IOSystem([iob2.i=>iob1.o], [iob1, iob2],
+        @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2],
                                             namespace_map = [iob1.o=>y, iob2.o=>y])
     end
 
@@ -167,8 +167,10 @@ using LightGraphs
         allvars = union(allvars...) |> unique
         allvars = setdiff(allvars, [BlockSystems.independent_variable(ios)])
         allkeys = keys(ios.namespace_map)
-        @test isempty(Set(allkeys) ∩ Set(keys(ios.connections)))
-        allkeys = Set(allkeys) ∪ Set(keys(ios.connections))
+        # closed inputs should not appear in allkeys
+        @test isempty(Set(allkeys) ∩ Set(last.(ios.connections)))
+        # but there should be no namespace collision with them either..
+        allkeys = Set(allkeys) ∪ Set(last.(ios.connections))
         @test allunique(allkeys)
         @test Set(allkeys) == Set(allvars)
     end
@@ -196,7 +198,7 @@ using LightGraphs
         ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
 
         # try with auto namespacing
-        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        name=:sys)
         @test Set(sys.inputs) == Set([iob1.i1, iob1.i2, iob2.i1, iob2.i2])
@@ -208,7 +210,7 @@ using LightGraphs
         # provide maps
         @parameters in1(t) in2(t) in3(t) in4(t) p1 p2
         @variables out(t) y1(t) y2(t)
-        sys1 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys1 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(iob1.i1 => in1,
                                             iob1.i2 => in2,
@@ -223,7 +225,7 @@ using LightGraphs
                                             ioadd.add => out),
                        outputs = [ioadd.add],
                        name=:sys)
-        sys2 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys2 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(iob1.i1 => :in1,
                                             iob1.i2 => :in2,
@@ -251,7 +253,7 @@ using LightGraphs
         test_complete_namespace_promotions(sys2)
 
         # provide partial maps
-        sys = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(iob1.i1 => in1,
                                             iob1.i2 => in2,
@@ -268,19 +270,19 @@ using LightGraphs
         test_complete_namespace_promotions(sys)
 
         # check for argument error for bad outputs argument
-        sys1 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys1 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(ioadd.add => out),
                        outputs = [ioadd.add], # provide outputs as namespaced variable
                        name=:sys)
-        sys2 = IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        sys2 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                        [iob1, iob2, ioadd],
                        namespace_map = Dict(ioadd.add => out),
                        outputs = [out], # provide outputs as namespaced variable
                        name=:sys)
         @test Set(sys1.istates) == Set(sys2.istates)
         @test Set(sys1.outputs) == Set(sys2.outputs)
-        @test_throws ArgumentError IOSystem([ioadd.ina => iob1.o, ioadd.inb => iob2.o],
+        @test_throws ArgumentError IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
                                             [iob1, iob2, ioadd],
                                             namespace_map = Dict(ioadd.add => out),
                                             outputs = [p1], # provide outputs as namespaced variable

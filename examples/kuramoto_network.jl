@@ -57,7 +57,7 @@ For the (static) edges we can't used IOSystem function building in the moment.
 Well, we could but than we'd get an `ODEEdge` with zero-massmatrix.
 =#
 @parameters v₁(t) v₂(t) K
-edge_ip = build_function([K*sin(v₁[1] - v₂[1])], v₁, v₂, K, t, expression=Val{false})[2]
+edge_ip = build_function([K*sin(v₁[1] - v₂[1])], [v₁], [v₂], K, t, expression=Val{false})[2]
 edge = StaticEdge(f! = edge_ip, dim = 1, coupling=:antisymmetric)
 
 nothing #hide
