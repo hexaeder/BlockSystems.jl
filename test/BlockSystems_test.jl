@@ -303,9 +303,9 @@ using LightGraphs
         iob2 = IOBlock(eqs, [uᵢ], [iᵢ, iᵣ])
         iob3 = IOBlock(eqs, [uᵢ, uᵣ], [iᵢ])
 
-        @test fulfils(iob1, bs1) == bs1(iob1) == true
-        @test fulfils(iob2, bs1) == bs1(iob2) == false
-        @test fulfils(iob3, bs1) == bs1(iob3) == false
+        @test fulfills(iob1, bs1) == bs1(iob1) == true
+        @test fulfills(iob2, bs1) == bs1(iob2) == false
+        @test fulfills(iob3, bs1) == bs1(iob3) == false
 
         sys1 = IOSystem([], [iob1, iob2])
         sys2 = IOSystem([], [iob1, iob2], outputs=[iᵢ, iᵣ],

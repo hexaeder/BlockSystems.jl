@@ -263,7 +263,7 @@ function IOSystem(cons,
 end
 
 
-export BlockSpec, fulfils
+export BlockSpec, fulfills
 
 """
     struct BlockSpec
@@ -272,13 +272,13 @@ Block specification, defines which inputs/outputs an [`AbstractIOSystem`](@ref)
 should have. Contains two vectors of `Symbols`. Can be initialized with Vectors
 of `Symbols`, `Num` or `<:Symbolic`.
 
-Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfils
-specification. See also [`fulfils`](@ref).
+Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfills
+specification. See also [`fulfills`](@ref).
 
 ```
 iob = IOBlock(...)
 spec = BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])
-fulfils(iob, spec)
+fulfills(iob, spec)
 spec(iob)
 ```
 """
@@ -289,14 +289,14 @@ end
 BlockSpec(in::Vector{Num}, out::Vector{Num}) = BlockSpec(value.(in), value.(out))
 BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}) = BlockSpec(getname.(in), getname.(out))
 
-(bs::BlockSpec)(io) = fulfils(io, bs)
+(bs::BlockSpec)(io) = fulfills(io, bs)
 
 """
-    fulfils(io, bs::BlockSpec)::Bool
+    fulfills(io, bs::BlockSpec)::Bool
 
-Check whether `io` fulfils the given [`BlockSpec`](@ref).
+Check whether `io` fulfills the given [`BlockSpec`](@ref).
 """
-fulfils(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
+fulfills(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
                                 Set(bs.outputs) ⊆ Set(getname.(io.outputs))
 
 

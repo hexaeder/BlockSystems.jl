@@ -57,6 +57,6 @@ generate_io_function
 Sometimes it is useful to define a the input/output structure for a block.
 ```@docs
 BlockSpec
-fulfils
+fulfills
 ```
 
