@@ -33,15 +33,15 @@ end
 
 vertex = generate_ode_vertex(kmvert, sumedges)</code></pre><pre class="documenter-example-output">┌ Warning: The ordering of the states/inputs/params/rem_states might change from run to run. Therefore it is highly recommend to provide all variables in the f_* arguments
 │   states =
-│    1-element Array{Any,1}:
+│    1-element Array{SymbolicUtils.Symbolic,1}:
 │     ϕ(t)
 │   inputs =
-│    1-element Array{Any,1}:
+│    1-element Array{SymbolicUtils.Symbolic,1}:
 │     edgesum(t)
 │   params =
-│    1-element Array{Any,1}:
+│    1-element Array{SymbolicUtils.Symbolic,1}:
 │     ω
-└ @ BlockSystems ~/work/BlockSystems.jl/BlockSystems.jl/src/function_generation.jl:65</pre><p>The edges are defined as</p><p class="math-container">\[e_{i,j} = K \cdot \mathrm{sin}(\phi_i - \phi_j)\]</p><p>For the (static) edges we can&#39;t used IOSystem function building in the moment. Well, we could but than we&#39;d get an <code>ODEEdge</code> with zero-massmatrix.</p><pre><code class="language-">@parameters v₁(t) v₂(t) K
+└ @ BlockSystems ~/work/BlockSystems.jl/BlockSystems.jl/src/function_generation.jl:66</pre><p>The edges are defined as</p><p class="math-container">\[e_{i,j} = K \cdot \mathrm{sin}(\phi_i - \phi_j)\]</p><p>For the (static) edges we can&#39;t used IOSystem function building in the moment. Well, we could but than we&#39;d get an <code>ODEEdge</code> with zero-massmatrix.</p><pre><code class="language-">@parameters v₁(t) v₂(t) K
 edge_ip = build_function([K*sin(v₁[1] - v₂[1])], v₁, v₂, K, t, expression=Val{false})[2]
 edge = StaticEdge(f! = edge_ip, dim = 1, coupling=:antisymmetric)
 
@@ -61,4 +61,4 @@ x0 .-= sum(x0)./N
 tspan = (0., 10.)
 prob = ODEProblem(nd, x0, tspan, p)
 sol = solve(prob, Tsit5())
-plot(sol, ylabel=&quot;ϕ&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spacecraft/">« Spacecraft</a><a class="docs-footer-nextpage" href="../kuramoto_without_nd/">Kuramoto without ND.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 12 February 2021 19:38">Friday 12 February 2021</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+plot(sol, ylabel=&quot;ϕ&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spacecraft/">« Spacecraft</a><a class="docs-footer-nextpage" href="../kuramoto_without_nd/">Kuramoto without ND.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 15 February 2021 20:38">Monday 15 February 2021</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
