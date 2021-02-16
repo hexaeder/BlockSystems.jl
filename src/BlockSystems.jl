@@ -358,7 +358,7 @@ function print_variables(io::IO, V::Vector{Symbolic})
         print(io, "(empty)")
         return
     elseif l > printmax
-        print(V[1], ", …$(l-2)…,", V[end])
+        print(io, V[1], ", …$(l-2)…,", V[end])
     else
         for (i, v) in enumerate(V)
             print(io, v)
