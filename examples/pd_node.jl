@@ -16,20 +16,20 @@ be defined by using these 'blueprints'. Stuff like this should go to a library o
 components at some point.
 
 =#
-# low pass filter
+# #### low pass filter
 @parameters τ input(t)
 @variables filtered(t)
 
 lpf = IOBlock([D(filtered) ~ 1/τ * (- filtered + input)],
               [input], [filtered])
 
-# integrator
+# #### integrator
 @parameters x(t)
 @variables int(t)
 
 integrator = IOBlock([D(int) ~ x], [x], [int])
 
-# voltage source
+# #### voltage source
 
 @parameters ω(t) v(t) τ
 @variables u_i(t) u_r(t)
@@ -38,7 +38,7 @@ voltage_source = IOBlock([D(u_r) ~ -ω * u_i + (u_r^2 + u_i^2 - v^2)*τ*u_r,
                           D(u_i) ~  ω * u_r + (u_r^2 + u_i^2 - v^2)*τ*u_i],
                          [ω, v], [u_i, u_r])
 
-# Droop control
+# #### Droop control
 
 @parameters K u_ref x_ref x(t)
 @variables u(t)
@@ -65,11 +65,11 @@ We can put the blocks together to form this system:
 ```
      +----------+  +-------------+
  P --| p_filter |--|   p_droop   |   +----------+
-     |    τ     |  | u_ref, xref |-v-|          |
-     +----------+  +-------------+   | v_source |-- u_r
+     |    τ     |  | u_ref, xref |---|          |
+     +----------+  +-------------+  ω| v_source |-- u_r
                                      |    τ     |
-     +----------+  +-------------+   |          |-- u_i
- Q --| q_filter |--|   q_droop   |-ω-|          |
+     +----------+  +-------------+  v|          |-- u_i
+ Q --| q_filter |--|   q_droop   |---|          |
      |    τ     |  | u_ref, xref |   +----------+
      +----------+  +-------------+
 
@@ -100,9 +100,9 @@ We can achieve this by defining a nother block which converts `(i, u) ↦ (P, Q)
                +----------+  +-------------+
      +-----+   | p_filter |--|   p_droop   |   +----------+
 i_r--|     |-P-|    τ     |  | u_ref, xref |---|          |
-i_i--| pow |   +----------+  +-------------+  v| v_source |---+--u_r
+i_i--| pow |   +----------+  +-------------+  ω| v_source |---+--u_r
      |     |                                   |    τ     |   |
- +---|     |   +----------+  +-------------+  ω|          |-+-|--u_i
+ +---|     |   +----------+  +-------------+  v|          |-+-|--u_i
  | +-|     |-Q-| q_filter |--|   q_droop   |---|          | | |
  | | +-----+   |    τ     |  | u_ref, xref |   +----------+ | |
  | |           +----------+  +-------------+                | |
