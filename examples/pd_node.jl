@@ -32,10 +32,12 @@ integrator = IOBlock([D(int) ~ x], [x], [int])
 # #### voltage source
 
 @parameters ω(t) v(t) τ
-@variables u_i(t) u_r(t)
+@variables u_i(t) u_r(t) A(t)
 
-voltage_source = IOBlock([D(u_r) ~ -ω * u_i + (u_r^2 + u_i^2 - v^2)*τ*u_r,
-                          D(u_i) ~  ω * u_r + (u_r^2 + u_i^2 - v^2)*τ*u_i],
+## explicit algebraic equation for A will be reduced at connect
+voltage_source = IOBlock([A ~ 1/τ * (v/√(u_i^2 + u_r^2) - 1),
+                          D(u_r) ~ -ω * u_i + A*u_r,
+                          D(u_i) ~  ω * u_r + A*u_i],
                          [ω, v], [u_i, u_r])
 
 # #### Droop control
@@ -187,7 +189,7 @@ connected.q_filter₊τ => 1.0
 =#
 para = Dict(:p_filter₊τ => 1.0, # super legit parameter choice
             :q_filter₊τ => 1.0,
-            :v_source₊τ => 1.0,
+            :v_source₊τ => 2.0,
             :p_droop₊u_ref => 1.0,
             :q_droop₊u_ref => 1.0,
             :p_droop₊x_ref => 1.0,
@@ -210,7 +212,7 @@ branches=OrderedDict(
 
 powergrid = PowerGrid(buses,branches)
 operationpoint = find_operationpoint(powergrid)
-timespan= (0.0,5.)
+timespan= (0.0,15.)
 nothing #hide
 
 # simulating a voltage perturbation at node 1
@@ -218,5 +220,3 @@ fault1 = ChangeInitialConditions(node="bus1", var=:u_r, f=Inc(0.2))
 solution1 = simulate(fault1, powergrid, operationpoint, timespan)
 using Plots
 plot(solution1.dqsol)
-
-# well, it does something.
