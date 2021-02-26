@@ -162,7 +162,7 @@ function IONode(blk::IOBlock, parameters::Dict)
     gen = generate_io_function(blk,
                                f_states=[blk.u_r, blk.u_i],
                                f_inputs=[blk.i_r, blk.i_i],
-                               f_params=keys(parameters));
+                               f_params=keys(parameters), warn=false);
     IONode(blk, gen, collect(values(parameters)))
 end
 
@@ -186,7 +186,7 @@ Let's try it out:
 The parameters have to be provided as a Dict. This dict should contain all internal parameters of the block.
 The list of parameters can be retrieved from the block:
 =#
-@info "connected system:" connected.iparams connected.system.eqs
+@info "connected system:" connected.iparams
 
 #=
 The parameter dict can be defined in several ways, I think the first option is the most convenient
@@ -198,7 +198,6 @@ can be typed as `\_+<tab>`.
 connected.τ_P => 1.0
 ```
 =#
-
 para = Dict(
     :τ_v => 0.005,    # time constant voltage control delay
     :τ_P => 0.5,      # time constant active power measurement
@@ -211,7 +210,7 @@ para = Dict(
     :ω_r => 0.0)   # refrence/ desired frequency
 nothing #hide
 
-# Now let's test whether this works in PD..
+# Now let's test whether this works in PD...
 using PowerDynamics: SlackAlgebraic, PiModelLine,PowerGrid,find_operationpoint
 using OrderedCollections: OrderedDict
 
@@ -232,3 +231,102 @@ fault1 = ChangeInitialConditions(node="bus1", var=:u_r, f=Inc(0.2))
 solution1 = simulate(fault1, powergrid, operationpoint, timespan)
 using Plots
 plot(solution1.dqsol)
+
+#=
+## Compare against `VSIVoltagePT1`
+We  want to compare the newly defined node against the `VSIVoltagePT1` node for random data.
+Both nodes have slightly different states:
+ - `symbolsof(node_bs) == [:u_r, :u_i, :p_filtered, :q_filtered]`
+ - `symbolsof(node_pd) == [:u_r, :u_i, :ω, :q_m]`
+We need adapt the initial state for the different third variable:
+```math
+\omega = \omega_r - K_P\cdot(p_{\mathrm{filtered}} - P)\\
+\dot\omega = - K_P \cdot \dot{p}_{\mathrm{filtered}}
+```
+=#
+using Test
+@testset "Compare IONode vs. PD Node" begin
+    for i in 1:100
+        para = Dict(
+            :τ_v => rand(), # time constant voltage control delay
+            :τ_P => rand(), # time constant active power measurement
+            :τ_Q => rand(), # time constant reactive power measurement
+            :K_P => rand(), # droop constant frequency droop
+            :K_Q => rand(), # droop constant voltage droop
+            :V_r => rand(), # reference/ desired voltage
+            :P   => rand(), # active (real) power infeed
+            :Q   => rand(), # reactive (imag) power infeed                .
+            :ω_r => 0.0)    # refrence/ desired frequency
+
+        ## create IONode
+        node_bs = IONode(connected, para)
+        f_bs = construct_vertex(node_bs).f!
+
+        ## create PDNode
+        ## the PD node does not have the explicit ω_r parameter
+        para_pd = delete!(copy(para), :ω_r)
+        nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
+        node_pd = VSIVoltagePT1(; nt...)
+        f_pd = construct_vertex(node_pd).f!
+
+        ## create fake "edge data", 4 incoming, 4 outgooing with 4 states each
+        es = [randn(4) for i in 1:4]
+        ed = [randn(4) for i in 1:4]
+
+        ## select random time
+        t = rand()
+
+        ## chose random initial state and account for initial ω in PD node
+        x_bs = randn(4)
+        x_pd = copy(x_bs)
+        x_pd[3] = - para[:K_P] * (x_bs[3] - para[:P])
+
+        ## create arrays for the results
+        dx_bs = similar(x_bs)
+        dx_pd = similar(x_pd)
+
+        ## call both functions
+        f_bs(dx_bs, x_bs, es, ed, nothing, t)
+        f_pd(dx_pd, x_pd, es, ed, nothing, t)
+
+        ## compare results
+        ## we have to correct variable 3 of bs implementation to match dω
+        @test dx_bs[1] ≈ dx_pd[1]                # u_r
+        @test dx_bs[2] ≈ dx_pd[2]                # u_i
+        @test - para[:K_P] * dx_bs[3] ≈ dx_pd[3] # ω
+        @test dx_bs[4] ≈ dx_pd[4]                # q_filtered
+    end
+end
+nothing #hide
+
+#=
+it works 🎉
+
+## Benchmark
+We can also run a quick benchmark of both node functions:
+=#
+para = Dict(:τ_v=>rand(),:τ_P=>rand(), :τ_Q=>rand(),
+            :K_P=>rand(), :K_Q=>rand(), :V_r=>rand(),
+            :P=>rand(), :Q=>rand(), :ω_r=>0.0)
+
+node_bs = IONode(connected, para)
+f_bs = construct_vertex(node_bs).f!
+para_pd = delete!(copy(para), :ω_r)
+nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
+node_pd = VSIVoltagePT1(; nt...)
+f_pd = construct_vertex(node_pd).f!
+
+es = [randn(4) for i in 1:4]
+ed = [randn(4) for i in 1:4]
+t = rand()
+
+## chose random initial state and account for initial ω in PD node
+x_bs = randn(4)
+x_pd = copy(x_bs)
+x_pd[3] = - para[:K_P] * (x_bs[3] - para[:P])
+dx = similar(x_bs)
+
+using BenchmarkTools
+@btime $f_bs($dx, $x_bs, $es, $ed, nothing, $t)
+@btime $f_pd($dx, $x_pd, $es, $ed, nothing, $t)
+# it seems like the `IONode` is even a bit faster.

@@ -23,6 +23,7 @@ mkpath(OUTPUT)
 
 for ex in examples
     Literate.markdown(ex, OUTPUT)
+    Literate.script(ex, OUTPUT)
 end
 
 makedocs(;

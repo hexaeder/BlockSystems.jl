@@ -97,7 +97,7 @@ outputs = [block.ϕ for block in vert_blocks]
 
 network = IOSystem(connections, vcat(vert_blocks, edge_blocks), outputs=outputs)
 
-networkblock = connect_system(network, verbose=true)
+networkblock = connect_system(network, verbose=false)
 nothing #hide
 
 # As the output shows the system has be reduced to just N equations.
