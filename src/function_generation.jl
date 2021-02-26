@@ -16,6 +16,7 @@ optional:
 - `f_params`: define parameters which should appear first
 - `f_rem_states`: define removed states algebraic state order
 - `expression=Val{false}`: toggle expression and callable function output
+- `warn=true`: toggle warnings for missing `f_*` parameters
 
 Returns an named tuple with the fields
 - for `type=:ode`:
@@ -35,7 +36,7 @@ Returns an named tuple with the fields
 """
 function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [],
                               f_params = [], f_rem_states = [],
-                              expression = Val{false}, verbose=false, type=:auto)
+                              expression = Val{false}, verbose=false, type=:auto, warn=true)
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
@@ -59,10 +60,10 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     rem_states = vcat(f_rem_states, ios.removed_states) |> unique
 
     # warning
-    if length(f_states) != length(states) ||
-        length(f_inputs) != length(inputs) ||
-        length(f_params) != length(params) ||
-        length(f_rem_states) != length(rem_states)
+    if warn && (length(f_states) != length(states) ||
+                length(f_inputs) != length(inputs) ||
+                length(f_params) != length(params) ||
+                length(f_rem_states) != length(rem_states))
         @warn "The ordering of the states/inputs/params/rem_states might change from run to run. Therefore it is highly recommend to provide all variables in the f_* arguments" states inputs params
     end
 
