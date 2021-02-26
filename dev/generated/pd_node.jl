@@ -162,7 +162,8 @@ using Test
         # create PDNode
         # the PD node does not have the explicit ω_r parameter
         para_pd = delete!(copy(para), :ω_r)
-        node_pd = VSIVoltagePT1(; NamedTuple(para_pd)...)
+        nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
+        node_pd = VSIVoltagePT1(; nt...)
         f_pd = construct_vertex(node_pd).f!
 
         # create fake "edge data", 4 incoming, 4 outgooing with 4 states each
@@ -202,7 +203,8 @@ para = Dict(:τ_v=>rand(),:τ_P=>rand(), :τ_Q=>rand(),
 node_bs = IONode(connected, para)
 f_bs = construct_vertex(node_bs).f!
 para_pd = delete!(copy(para), :ω_r)
-node_pd = VSIVoltagePT1(; NamedTuple(para_pd)...)
+nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
+node_pd = VSIVoltagePT1(; nt...)
 f_pd = construct_vertex(node_pd).f!
 
 es = [randn(4) for i in 1:4]
