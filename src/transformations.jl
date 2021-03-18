@@ -41,7 +41,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     # get red of unused states
     # (internal variables which are not used for the outputs)
     nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
-    reduced_eqs1 = remove_superfluous_states(eqs, independent_variable(ios), nspcd_outputs)
+    reduced_eqs1 = remove_superfluous_states(eqs, independent_variable(ios), nspcd_outputs; verbose)
     verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
@@ -75,38 +75,37 @@ end
 """
     remove_superfluous_states(eqs::Vector{Equation}, iv, outputs)
 
-This function removes equations, which are not used in order to generate the given
-`outputs`. It recursively looks for attracting components in the dependency graph which
-are not connected to the output nodes.
-Returns a new, reduced set of equations without these states.
-
-TODO: Change strategy, remove i if there is no path from i to outputs.
+This function removes equations, which are not used in order to generate the
+given `outputs`. It looks for equations which have no path to the `outputs`
+equations in the dependency graph. Returns a new, reduced set of equations
+without these states.
 """
-function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs)
+function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=false)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs, iv) # will be used for the dependency graph
     neweqs = sys.eqs # the ODESystem might reorder the equations
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
     # find 'main' eq for each output
-    eq_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
-    # find the attracting components, remove attracting components which do not include eqs
-    attr_components = attracting_components(graph)
+    output_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
+
+    if any(isnothing, output_idx)
+        verbose && @info "Can't remove souperflous states if outputs implicitly defined."
+        return neweqs
+    end
+
+    # if there is no path from equation to output equation is not necessary
     removable = []
-    for attr in attr_components
-        if isempty(Set(eq_idx) ∩ Set(attr))
-            append!(removable, attr)
+    for eq_node in 1:length(neweqs)
+        if !any(has_path(graph, eq_node, out_node) for out_node in output_idx)
+            push!(removable, eq_node)
         end
     end
-    @assert allunique(removable)
+
+    removed_eqs = neweqs[removable]
     deleteat!(neweqs, sort(removable))
 
-    # reduction has to be repeated recursively
-    if neweqs == eqs
-        return neweqs
-    else
-        return remove_superfluous_states(neweqs, iv, outputs)
-    end
+    return neweqs
 end
 
 """
