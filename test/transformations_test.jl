@@ -177,6 +177,21 @@ end
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
         @test eqs == iob.system.eqs
         @test iob.removed_eqs == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
+
+        @testset "test rename_vars" begin
+            @test_throws ArgumentError new = rename_vars(iob, in2=:in1)
+            new = rename_vars(iob, in2=:in2N, out=:outN, A₊x1=:y, a=:c)
+
+            @parameters in2N(t) c
+            @variables outN(t) y(t)
+            eqs = [D(y) ~ c * in1,
+                   D(A₊x2) ~ in2N,
+                   D(B₊x1) ~ b * in3,
+                   D(B₊x2) ~ in4,
+                   outN ~ (y + A₊x2) + (B₊x1 + B₊x2)]
+            @test eqs == new.system.eqs
+            @test new.removed_eqs == [A₊o ~ y + A₊x2, B₊o ~ B₊x1 + B₊x2]
+        end
     end
 
     @testset "system with removed equations in subsystem" begin
@@ -240,7 +255,6 @@ end
         @test Set(gen.inputs) == Set()
         @test Set(gen.params) == Set()
         @test Set(gen.rem_states) == Set(Sym{Real}.([:B₊o, :A₊o]))
-        systemblock.removed_eqs
 
         out = zeros(2)
         st = rand(3)

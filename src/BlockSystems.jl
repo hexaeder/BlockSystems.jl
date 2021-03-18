@@ -67,7 +67,9 @@ struct IOBlock <: AbstractIOSystem
         @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
         additional_vars = vars([eq.rhs for eq in rem_eqs])
-        all_vars = Set(inputs ∪ outputs ∪ istates ∪ iparams ∪ (odes.iv, ))
+        all_vars = vcat(inputs, outputs, istates, iparams, odes.iv)
+        @check uniquenames(all_vars) "There seem to be a name clashes between inputs, iparams istates and outputs!"
+        all_vars = Set(all_vars)
         @check additional_vars ⊆ all_vars "removed eqs should not contain new variables"
 
         if isempty(rem_eqs)
