@@ -1,4 +1,4 @@
-export connect_system
+export connect_system, rename_vars
 
 """
 $(SIGNATURES)
@@ -202,4 +202,34 @@ function pairwise_cycle_free(g::SimpleDiGraph)
             return idx
         end
     end
+end
+
+"""
+    rename_vars(blk::IOBLock, kwargs...)
+    rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
+
+Returns new IOBlock which is similar to blk but with new variable names.
+Variable renamings should be provided as keyword arguments, i.e.
+
+    rename_vars(blk; x=:newx, k=:knew)
+
+to rename `x(t)=>newx(t)` and `k=>knew`. Subsitutions can be also provided as
+dict of `Symbolic` types (`Sym`s and `Term`s).
+"""
+function rename_vars(blk::IOBlock; kwargs...)
+    substitutions = Dict{Symbolic, Symbolic}()
+    for pair in kwargs
+        key = remove_namespace(blk.name, getproperty(blk, pair.first))
+        val = rename(key, pair.second)
+        substitutions[key] = val
+    end
+    rename_vars(blk, substitutions)
+end
+
+function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
+    eqs     = map(eq->eqsubstitute(eq, subs), blk.system.eqs)
+    rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
+    inputs  = map(x->substitute(x, subs), blk.inputs)
+    outputs = map(x->substitute(x, subs), blk.outputs)
+    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs)
 end
