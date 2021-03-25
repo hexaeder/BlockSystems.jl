@@ -1,8 +1,8 @@
 #=
 ## Network Dynamics without NetworkDynamics.jl
-In this example we want to explore the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
-But this time without `NetworkDynamics.jl` ...
 =#
+## In this example we want to explore the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
+## But this time without `NetworkDynamics.jl` ...
 
 using LightGraphs
 using BlockSystems
@@ -11,45 +11,53 @@ using OrdinaryDiffEq
 using Plots
 
 #=
-The goal is to generate IOBlocks for edges and vertices based on a given graph. In order to do so we have to make the vertex blocks a bit special: since MDK does not support vector inputs we need a special IOBlock for each Vertex depending on the outgoing and incoming edges as inputs.
+The goal is to generate IOBlocks for edges and vertices based on a given graph.
+In order to do so we have to make the vertex blocks a bit special: since MDK
+does not support vector inputs we need a special IOBlock which depeends on the number
+of connected edges.
+
+In our model we look at a directed graph. Each edge is represented by a function on such edge.
+Each edge funciton sees the values of the connected nodes.
+
+The nodes are also modeld as functions. Each node sees all the *incoming* edge values.
+
+```
+     e₁₂ = f(1,2)
+     .---→---.
+   (1)       (2)
+     ˙---←---˙
+     e₂₁ = f(2,1)
+```
 =#
 function gen_edge_block(name)
     @parameters t src(t) dst(t) K
     @variables o(t)
-    IOBlock([ o ~ K*sin(src-dst) ], [src,dst], [o], name=Symbol(name))
+    IOBlock([o ~ K*sin(src-dst)], [src, dst], [o], name=Symbol(name))
 end
 
-function gen_vertex_block(n_in, n_out, name)
-    @parameters t ω edgesum(t)
-    @parameters in_edge[1:n_in](t)
-    @parameters out_edge[1:n_out](t)
+function gen_vertex_block(n_edges, name)
+    @parameters t ω
+    @parameters edge[1:n_edges](t)
     @variables ϕ(t)
     D = Differential(t)
 
-    rhs = ω
-    if n_in > 0
-        rhs += (+)(in_edge...)
-    end
-    if n_out > 0
-        rhs -= (+)(out_edge...)
-    end
-
-    IOBlock([D(ϕ) ~ rhs],
-            [in_edge..., out_edge...],
+    IOBlock([D(ϕ) ~ ω + (+)(edge...)],
+            [edge...],
             [ϕ],
             name=Symbol(name))
 end
 nothing #hide
 
 #=
-The graph is defined as in the other example.
+As a graph we chose a ring network of
+
 =#
 N = 8
-g = watts_strogatz(N,2,0) # ring network
+g = SimpleDiGraph(watts_strogatz(N,2,0)) # ring network
 nothing #hide
 
 # First we generate a list of all edge-blocks because the don't depend on the vertices.
-edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("$(e.src)to$(e.dst)")) for (i, e) in enumerate(edges(g))]
+edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("e_$(e.src)_$(e.dst)")) for (i, e) in enumerate(edges(g))]
 edge_blocks = [e.block for e in edgelist]
 nothing #hide
 
@@ -66,19 +74,18 @@ vert_blocks = IOBlock[]
 connections = Pair[]
 
 for i in vertices(g)
-    out_edges = filter(e->e.src == i, edgelist)
-    in_edges = filter(e->e.dst == i, edgelist)
-    block = gen_vertex_block(length(in_edges), length(out_edges), "v$i")
-    push!(vert_blocks, block)
+    # collect the incoming edges for each node
+    edges = filter(e -> e.dst == i, edgelist)
 
-    for (i, edge) in enumerate(out_edges)
-        input = getproperty(block, Symbol("out_edge", Char(0x02080 + i)))
-        push!(connections, edge.block.o => input)
-    end
+    node = gen_vertex_block(length(edges), "v$i")
+    push!(vert_blocks, node)
 
-    for (i, edge) in enumerate(in_edges)
-        input = getproperty(block, Symbol("in_edge", Char(0x02080 + i)))
-        push!(connections, edge.block.o => input)
+    # each node has the open inputs edge₁, edge₂, ...
+    # we need to connect the ouputs of those edge-blocks to the
+    # inputs of the node like edge1.o => node.edge₁
+    for (i, edge) in enumerate(edges)
+        node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
+        push!(connections, edge.block.o => node_input_i)
     end
 end
 

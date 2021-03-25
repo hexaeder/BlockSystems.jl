@@ -48,5 +48,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/hexaeder/BlockSystems.jl",
     devbranch="main",
-    # push_preview=true,
+    push_preview=true,
 )
