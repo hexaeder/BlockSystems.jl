@@ -1,8 +1,8 @@
 #=
 ## Network Dynamics without NetworkDynamics.jl
 =#
-## In this example we want to explore the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
-## But this time without `NetworkDynamics.jl` ...
+#src In this example we want to explore the same problem as in [Integration with `NetworkDynamics.jl`](@ref).
+#src But this time without `NetworkDynamics.jl` ...
 
 using LightGraphs
 using BlockSystems
@@ -74,15 +74,15 @@ vert_blocks = IOBlock[]
 connections = Pair[]
 
 for i in vertices(g)
-    # collect the incoming edges for each node
+    ## collect the incoming edges for each node
     edges = filter(e -> e.dst == i, edgelist)
 
     node = gen_vertex_block(length(edges), "v$i")
     push!(vert_blocks, node)
 
-    # each node has the open inputs edge₁, edge₂, ...
-    # we need to connect the ouputs of those edge-blocks to the
-    # inputs of the node like edge1.o => node.edge₁
+    ## each node has the open inputs edge₁, edge₂, ...
+    ## we need to connect the ouputs of those edge-blocks to the
+    ## inputs of the node like edge1.o => node.edge₁
     for (i, edge) in enumerate(edges)
         node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
         push!(connections, edge.block.o => node_input_i)
@@ -112,7 +112,8 @@ nothing #hide
 gen = generate_io_function(networkblock,
                            f_states=[v.ϕ for v in vert_blocks],
                            f_params=vcat([v.ω for v in vert_blocks],
-                                         [e.K for e in edge_blocks]))
+                                         [e.K for e in edge_blocks]),
+                           warn=false);
 nothing #hide
 
 # ... enclose the `f_ip` to get rid of the empty `inputs` field...
