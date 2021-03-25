@@ -1,6 +1,3 @@
-# In this example we want to explore the same problem as in Integration with `NetworkDynamics.jl`.
-# But this time without `NetworkDynamics.jl` ...
-
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
