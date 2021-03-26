@@ -6,18 +6,18 @@ using Plots
 
 function gen_edge_block(name)
     @parameters t src(t) dst(t) K
-    @variables o(t)
-    IOBlock([o ~ K*sin(src-dst)], [src, dst], [o], name=Symbol(name))
+    @variables out(t)
+    IOBlock([out ~ K*sin(src-dst)], [src, dst], [out], name=Symbol(name))
 end
 
 function gen_vertex_block(n_edges, name)
     @parameters t ω
-    @parameters edge[1:n_edges](t)
+    @parameters edges[1:n_edges](t)
     @variables ϕ(t)
     D = Differential(t)
 
-    IOBlock([D(ϕ) ~ ω + (+)(edge...)],
-            [edge...],
+    IOBlock([D(ϕ) ~ ω + (+)(edges...)],
+            [edges...],
             [ϕ],
             name=Symbol(name))
 end
@@ -27,7 +27,8 @@ N = 8
 g = SimpleDiGraph(watts_strogatz(N,2,0)) # ring network
 nothing #hide
 
-edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("e_$(e.src)_$(e.dst)")) for (i, e) in enumerate(edges(g))]
+edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("e_$(e.src)_$(e.dst)"))
+            for (i, e) in enumerate(edges(g))]
 edge_blocks = [e.block for e in edgelist]
 nothing #hide
 
@@ -42,11 +43,11 @@ for i in vertices(g)
     push!(vert_blocks, node)
 
     # each node has the open inputs edge₁, edge₂, ...
-    # we need to connect the ouputs of those edge-blocks to the
-    # inputs of the node like edge1.o => node.edge₁
+    # we need to connect the ouputs of the edge-blocks to the
+    # inputs of the node like edge_j_to_1.out => node.edge₁
     for (i, edge) in enumerate(edges)
         node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
-        push!(connections, edge.block.o => node_input_i)
+        push!(connections, edge.block.out => node_input_i)
     end
 end
 
