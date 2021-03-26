@@ -1,6 +1,3 @@
-using Pkg
-Pkg.activate(@__DIR__)
-
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
@@ -46,7 +43,7 @@ for i in vertices(g)
     push!(vert_blocks, node)
 
     # each node has the open inputs edge₁, edge₂, ...
-    # we need to connect the ouputs of the edge-blocks to the
+    # we need to connect the outputs of the edge-blocks to the
     # inputs of the node like edge_j_to_1.out => node.edge₁
     for (i, edge) in enumerate(edges)
         node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
