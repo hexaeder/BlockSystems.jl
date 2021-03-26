@@ -6,10 +6,6 @@
 #=
 In this example we model a Kuramoto system on a complex network.
 =#
-
-using Pkg
-Pkg.activate(@__DIR__)
-
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
@@ -23,7 +19,7 @@ node j but not vice versa.
 
 Symmetries of the system such as (anti-)symmetric coupling functions may justify other
 approaches, but those are of limited scope, for a detailed discussion see
-https://arxiv.org/abs/2012.12696, Section II.D.
+[our paper](https://arxiv.org/abs/2012.12696), Section II.D.
 
 In the following each edge is represented by a function:
 
@@ -35,8 +31,8 @@ In the following each edge is represented by a function:
      e₂₁ = f(2,1)
 ```
 
-Each edge funciton sees the values of the connected nodes, its source and its destination.
-Node are modeled as functions as well and see all their *incoming* edges.
+Each edge function sees the values of the connected nodes, its source and its destination.
+Nodes are modeled as functions as well and see all their *incoming* edges.
 
 The goal is to generate IOBlocks for edges and vertices based on a given graph.
 
@@ -82,8 +78,8 @@ nothing #hide
 Now we can generate vertex blocks based on their number of incoming edges.
 We will also create the connections
 ```
-edge_i_to_k.out => node.edge₁
-edge_j_to_k.out => node.edge₂
+e_i_k.out => node.edge₁
+e_j_k.out => node.edge₂
 ...
 ```
 for all edges that go from vertices i or j to vertex k.
@@ -99,7 +95,7 @@ for i in vertices(g)
     push!(vert_blocks, node)
 
     ## each node has the open inputs edge₁, edge₂, ...
-    ## we need to connect the ouputs of the edge-blocks to the
+    ## we need to connect the outputs of the edge-blocks to the
     ## inputs of the node like edge_j_to_1.out => node.edge₁
     for (i, edge) in enumerate(edges)
         node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
