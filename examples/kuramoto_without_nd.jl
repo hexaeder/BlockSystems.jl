@@ -7,6 +7,9 @@
 In this example we model a Kuramoto system on a complex network.
 =#
 
+using Pkg
+Pkg.activate(@__DIR__)
+
 using LightGraphs
 using BlockSystems
 using ModelingToolkit
@@ -49,12 +52,12 @@ end
 
 function gen_vertex_block(n_edges, name)
     @parameters t ω
-    @parameters edges[1:n_edges](t)
+    @parameters edge[1:n_edges](t)
     @variables ϕ(t)
     D = Differential(t)
 
-    IOBlock([D(ϕ) ~ ω + (+)(edges...)],
-            [edges...],
+    IOBlock([D(ϕ) ~ ω + (+)(edge...)],
+            [edge...],
             [ϕ],
             name=Symbol(name))
 end
