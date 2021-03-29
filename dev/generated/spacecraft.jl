@@ -41,7 +41,7 @@ space_controller = IOSystem([prop_c.o => spacecraft.F, spacecraft.x => prop_c.fe
                             outputs = [altitude])
 # we want to reduce the space_controller to a block
 space_controller = connect_system(space_controller)
-@info "Variables of space_controller" space_controller space_controller.system.eqs
+@info "Variables of space_controller" space_controller get_eqs(space_controller.system)
 
 gen = generate_io_function(space_controller)
 nothing # hide
@@ -113,7 +113,7 @@ space_controller = IOSystem([pi_c.o => spacecraft.F , spacecraft.x => pi_c.feedb
                             namespace_map = [spacecraft.x => altitude],
                             outputs = [altitude])
 space_controller = connect_system(space_controller, verbose=false)
-@info "Variables of space_controller" space_controller space_controller.system.eqs
+@info "Variables of space_controller" space_controller get_eqs(space_controller.system)
 
 gen = generate_io_function(space_controller, f_states=[altitude], f_params=[K, T, M])
 
