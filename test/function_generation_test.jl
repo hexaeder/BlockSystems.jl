@@ -1,6 +1,7 @@
 using Test
 using BlockSystems
 using ModelingToolkit
+using ModelingToolkit: get_iv, get_eqs, get_states
 using LinearAlgebra
 
 @info "Testes of function_generation.jl"

@@ -3,7 +3,6 @@ using BlockSystems
 using BlockSystems: @check
 using ModelingToolkit
 using ModelingToolkit: value
-using SymbolicUtils
 using SymbolicUtils: operation
 
 @info "Tests of utils.jl"

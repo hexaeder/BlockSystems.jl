@@ -41,7 +41,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     # get red of unused states
     # (internal variables which are not used for the outputs)
     nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
-    reduced_eqs1 = remove_superfluous_states(eqs, independent_variable(ios), nspcd_outputs; verbose)
+    reduced_eqs1 = remove_superfluous_states(eqs, get_iv(ios), nspcd_outputs; verbose)
     verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
@@ -83,7 +83,7 @@ without these states.
 function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=false)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs, iv) # will be used for the dependency graph
-    neweqs = sys.eqs # the ODESystem might reorder the equations
+    neweqs = get_eqs(sys) # the ODESystem might reorder the equations
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
     # find 'main' eq for each output
@@ -226,7 +226,7 @@ function rename_vars(blk::IOBlock; kwargs...)
 end
 
 function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
-    eqs     = map(eq->eqsubstitute(eq, subs), blk.system.eqs)
+    eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
     inputs  = map(x->substitute(x, subs), blk.inputs)
     outputs = map(x->substitute(x, subs), blk.outputs)

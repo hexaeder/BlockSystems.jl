@@ -4,12 +4,13 @@ using LinearAlgebra
 using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
+using ModelingToolkit: get_iv, get_eqs, get_states
 using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using SymbolicUtils: Symbolic, operation
 using LightGraphs
 
-export AbstractIOSystem, IOBlock, IOSystem, independent_variable
+export AbstractIOSystem, IOBlock, IOSystem, get_iv
 
 include("utils.jl")
 
@@ -67,7 +68,7 @@ struct IOBlock <: AbstractIOSystem
         @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
         additional_vars = get_variables([eq.rhs for eq in rem_eqs])
-        all_vars = vcat(inputs, outputs, istates, iparams, odes.iv)
+        all_vars = vcat(inputs, outputs, istates, iparams, get_iv(odes))
         @check uniquenames(all_vars) "There seem to be a name clashes between inputs, iparams istates and outputs!"
         all_vars = Set(all_vars)
         @check additional_vars ⊆ all_vars "removed eqs should not contain new variables"
@@ -88,12 +89,12 @@ struct IOBlock <: AbstractIOSystem
     end
 end
 
-independent_variable(block::IOBlock) = block.system.iv
+ModelingToolkit.get_iv(block::IOBlock) = get_iv(block.system)
 
 function namespace_rem_eqs(iob::IOBlock)
     eqs = iob.removed_eqs
     isempty(eqs) && return Equation[]
-    map(eq->namespace_equation(eq, iob.name, independent_variable(iob)), eqs)
+    map(eq->namespace_equation(eq, iob.name, get_iv(iob)), eqs)
 end
 
 """
@@ -119,7 +120,7 @@ function IOBlock(name, eqs, inputs, outputs, rem_eqs)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
     outputs = value.(outputs) # gets the outputs as `tern` type
-    istates = setdiff(os.states, outputs)
+    istates = setdiff(get_states(os), outputs)
     iparams = setdiff(parameters(os), inputs)
 
     IOBlock(name, inputs, iparams, istates, outputs, os, rem_eqs)
@@ -133,7 +134,7 @@ Construct a new IOBlock based on an existing. Deep-copy all fields and assigns n
 """
 function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
     cp = deepcopy(iob)
-    odes = ODESystem(cp.system.eqs, cp.system.iv, name=name)
+    odes = ODESystem(get_eqs(cp.system), get_iv(cp), name=name)
     IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs)
 end
 
@@ -164,7 +165,7 @@ end
 # TODO: check IOSystem assumptions in inner constructor?
 # - check that every variable found in the equations is referenced by namespace map
 
-independent_variable(sys::IOSystem) = independent_variable(first(sys.systems))
+ModelingToolkit.get_iv(sys::IOSystem) = get_iv(first(sys.systems))
 
 """
 $(SIGNATURES)
@@ -195,7 +196,7 @@ function IOSystem(cons,
     namespaces = [sys.name for sys in io_systems]
     allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
 
-    ivs = unique([independent_variable(sys) for sys in io_systems])
+    ivs = unique([get_iv(sys) for sys in io_systems])
     length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
 
     nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...)
