@@ -87,7 +87,7 @@ function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=f
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
     # find 'main' eq for each output
-    output_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
+    output_idx = [findfirst(x->o ∈ Set(get_variables(x.lhs)), neweqs) for o in outputs]
 
     if any(isnothing, output_idx)
         verbose && @info "Can't remove souperflous states if outputs implicitly defined."
@@ -150,7 +150,7 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
     # generate dependency graph
     g = SimpleDiGraph(length(algebraic_idx))
     for (i, eq) in enumerate(reduced_eqs[algebraic_idx])
-        rhs_vars = vars(eq.rhs)
+        rhs_vars = get_variables(eq.rhs)
         for (isym, sym) in enumerate(symbols)
             if Set([sym]) ⊆ Set(rhs_vars)
                 add_edge!(g, isym => i)

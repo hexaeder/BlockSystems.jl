@@ -4,7 +4,7 @@ using LinearAlgebra
 using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: Parameter, ODESystem, Differential
-using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym, vars
+using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using SymbolicUtils: Symbolic, operation
 using LightGraphs
@@ -66,7 +66,7 @@ struct IOBlock <: AbstractIOSystem
         @check Set(inputs ∪ iparams) == Set(parameters(odes)) "inputs ∪ iparams != params"
         @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
-        additional_vars = vars([eq.rhs for eq in rem_eqs])
+        additional_vars = get_variables([eq.rhs for eq in rem_eqs])
         all_vars = vcat(inputs, outputs, istates, iparams, odes.iv)
         @check uniquenames(all_vars) "There seem to be a name clashes between inputs, iparams istates and outputs!"
         all_vars = Set(all_vars)
@@ -77,7 +77,7 @@ struct IOBlock <: AbstractIOSystem
         else
             rem_states = lhs_var.(rem_eqs)
             @check isempty(rem_states ∩ all_vars) "removed states should not appear in in/out/is/ip"
-            rem_rhs_vars = union([vars(eq.rhs) for eq in rem_eqs]...)
+            rem_rhs_vars = union([get_variables(eq.rhs) for eq in rem_eqs]...)
             @check rem_rhs_vars ⊆ all_vars "rhs of removed eqs should be subset of in/out/is/ip"
         end
 

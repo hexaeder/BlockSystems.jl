@@ -1,7 +1,6 @@
 using Test
 using BlockSystems
 using ModelingToolkit
-using ModelingToolkit: vars, value
 using LightGraphs
 
 @info "Tests of BlockSystems.jl"
@@ -163,7 +162,7 @@ using LightGraphs
 
     function test_complete_namespace_promotions(ios)
         eqs = vcat([ModelingToolkit.namespace_equations(iob.system) for iob in ios.systems]...)
-        allvars = [(vars(eq.lhs) ∪ vars(eq.rhs)) for eq in eqs]
+        allvars = [(get_variables(eq.lhs) ∪ get_variables(eq.rhs)) for eq in eqs]
         allvars = union(allvars...) |> unique
         allvars = setdiff(allvars, [BlockSystems.independent_variable(ios)])
         allkeys = keys(ios.namespace_map)
