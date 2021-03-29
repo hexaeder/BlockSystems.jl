@@ -6,37 +6,29 @@ using Plots
 
 function gen_edge_block(name)
     @parameters t src(t) dst(t) K
-    @variables o(t)
-    IOBlock([ o ~ K*sin(src-dst) ], [src,dst], [o], name=Symbol(name))
+    @variables out(t)
+    IOBlock([out ~ K*sin(src-dst)], [src, dst], [out], name=Symbol(name))
 end
 
-function gen_vertex_block(n_in, n_out, name)
-    @parameters t ω edgesum(t)
-    @parameters in_edge[1:n_in](t)
-    @parameters out_edge[1:n_out](t)
+function gen_vertex_block(n_edges, name)
+    @parameters t ω
+    @parameters edge[1:n_edges](t)
     @variables ϕ(t)
     D = Differential(t)
 
-    rhs = ω
-    if n_in > 0
-        rhs += (+)(in_edge...)
-    end
-    if n_out > 0
-        rhs -= (+)(out_edge...)
-    end
-
-    IOBlock([D(ϕ) ~ rhs],
-            [in_edge..., out_edge...],
+    IOBlock([D(ϕ) ~ ω + (+)(edge...)],
+            [edge...],
             [ϕ],
             name=Symbol(name))
 end
 nothing #hide
 
 N = 8
-g = watts_strogatz(N,2,0) # ring network
+g = SimpleDiGraph(watts_strogatz(N,2,0)) # ring network
 nothing #hide
 
-edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("$(e.src)to$(e.dst)")) for (i, e) in enumerate(edges(g))]
+edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block("e_$(e.src)_$(e.dst)"))
+            for (i, e) in enumerate(edges(g))]
 edge_blocks = [e.block for e in edgelist]
 nothing #hide
 
@@ -44,19 +36,18 @@ vert_blocks = IOBlock[]
 connections = Pair[]
 
 for i in vertices(g)
-    out_edges = filter(e->e.src == i, edgelist)
-    in_edges = filter(e->e.dst == i, edgelist)
-    block = gen_vertex_block(length(in_edges), length(out_edges), "v$i")
-    push!(vert_blocks, block)
+    # collect the incoming edges for each node
+    edges = filter(e -> e.dst == i, edgelist)
 
-    for (i, edge) in enumerate(out_edges)
-        input = getproperty(block, Symbol("out_edge", Char(0x02080 + i)))
-        push!(connections, edge.block.o => input)
-    end
+    node = gen_vertex_block(length(edges), "v$i")
+    push!(vert_blocks, node)
 
-    for (i, edge) in enumerate(in_edges)
-        input = getproperty(block, Symbol("in_edge", Char(0x02080 + i)))
-        push!(connections, edge.block.o => input)
+    # each node has the open inputs edge₁, edge₂, ...
+    # we need to connect the outputs of the edge-blocks to the
+    # inputs of the node like edge_j_to_1.out => node.edge₁
+    for (i, edge) in enumerate(edges)
+        node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
+        push!(connections, edge.block.out => node_input_i)
     end
 end
 
@@ -75,7 +66,8 @@ nothing #hide
 gen = generate_io_function(networkblock,
                            f_states=[v.ϕ for v in vert_blocks],
                            f_params=vcat([v.ω for v in vert_blocks],
-                                         [e.K for e in edge_blocks]))
+                                         [e.K for e in edge_blocks]),
+                           warn=false);
 nothing #hide
 
 odefun(du, u, p, t) = gen.f_ip(du, u, (), p, t)
