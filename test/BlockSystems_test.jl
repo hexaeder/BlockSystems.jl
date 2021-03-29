@@ -1,7 +1,7 @@
 using Test
 using BlockSystems
 using ModelingToolkit
-using ModelingToolkit: vars, value
+using ModelingToolkit: get_iv, get_eqs, get_states
 using LightGraphs
 
 @info "Tests of BlockSystems.jl"
@@ -83,7 +83,7 @@ using LightGraphs
         @test Set(iob1.iparams) == Set(iob2.iparams) == Set(iob3.iparams)
         @test Set(iob1.istates) == Set(iob2.istates) == Set(iob3.istates)
         @test Set(iob1.outputs) == Set(iob2.outputs) == Set(iob3.outputs)
-        @test iob1.system.eqs == iob2.system.eqs == iob3.system.eqs
+        @test get_eqs(iob1.system) == get_eqs(iob2.system) == get_eqs(iob3.system)
         @test iob1.system.name == iob1.name == :iob1
         @test iob2.system.name == iob2.name == :iob2
         @test iob3.system.name == iob3.name
@@ -163,9 +163,9 @@ using LightGraphs
 
     function test_complete_namespace_promotions(ios)
         eqs = vcat([ModelingToolkit.namespace_equations(iob.system) for iob in ios.systems]...)
-        allvars = [(vars(eq.lhs) ∪ vars(eq.rhs)) for eq in eqs]
+        allvars = [(get_variables(eq.lhs) ∪ get_variables(eq.rhs)) for eq in eqs]
         allvars = union(allvars...) |> unique
-        allvars = setdiff(allvars, [BlockSystems.independent_variable(ios)])
+        allvars = setdiff(allvars, [BlockSystems.get_iv(ios)])
         allkeys = keys(ios.namespace_map)
         # closed inputs should not appear in allkeys
         @test isempty(Set(allkeys) ∩ Set(last.(ios.connections)))

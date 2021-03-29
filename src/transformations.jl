@@ -41,7 +41,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     # get red of unused states
     # (internal variables which are not used for the outputs)
     nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
-    reduced_eqs1 = remove_superfluous_states(eqs, independent_variable(ios), nspcd_outputs; verbose)
+    reduced_eqs1 = remove_superfluous_states(eqs, get_iv(ios), nspcd_outputs; verbose)
     verbose && @info "without superfluous states" reduced_eqs1
 
     # reduce algebraic states of the system
@@ -83,11 +83,11 @@ without these states.
 function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=false)
     neweqs = deepcopy(eqs)
     sys = ODESystem(neweqs, iv) # will be used for the dependency graph
-    neweqs = sys.eqs # the ODESystem might reorder the equations
+    neweqs = get_eqs(sys) # the ODESystem might reorder the equations
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))
     # find 'main' eq for each output
-    output_idx = [findfirst(x->o ∈ Set(ModelingToolkit.vars(x.lhs)), neweqs) for o in outputs]
+    output_idx = [findfirst(x->o ∈ Set(get_variables(x.lhs)), neweqs) for o in outputs]
 
     if any(isnothing, output_idx)
         verbose && @info "Can't remove souperflous states if outputs implicitly defined."
@@ -150,7 +150,7 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
     # generate dependency graph
     g = SimpleDiGraph(length(algebraic_idx))
     for (i, eq) in enumerate(reduced_eqs[algebraic_idx])
-        rhs_vars = vars(eq.rhs)
+        rhs_vars = get_variables(eq.rhs)
         for (isym, sym) in enumerate(symbols)
             if Set([sym]) ⊆ Set(rhs_vars)
                 add_edge!(g, isym => i)
@@ -226,7 +226,7 @@ function rename_vars(blk::IOBlock; kwargs...)
 end
 
 function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
-    eqs     = map(eq->eqsubstitute(eq, subs), blk.system.eqs)
+    eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
     inputs  = map(x->substitute(x, subs), blk.inputs)
     outputs = map(x->substitute(x, subs), blk.outputs)

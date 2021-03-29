@@ -68,7 +68,7 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     end
 
     # reorder the equations to get du in the right order
-    eqs = reorder_by_states(ios.system.eqs, states)
+    eqs = reorder_by_states(get_eqs(ios.system), states)
     verbose && @info "Reordered eqs" eqs states
 
     if type == :auto
@@ -105,9 +105,9 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
 
     # generate functions
     if type == :ode
-        f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
+        f_oop, f_ip = build_function(formulas, state_syms, input_syms, param_syms, get_iv(ios); expression = expression)
     elseif type == :static
-        f_oop, f_ip = build_function(formulas, input_syms, param_syms, ios.system.iv; expression = expression)
+        f_oop, f_ip = build_function(formulas, input_syms, param_syms, get_iv(ios); expression = expression)
     end
 
     # generate functions for removed states
@@ -118,7 +118,7 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
         verbose && @info "Reordered removed eqs" rem_eqs rem_states
 
         rem_formulas = [substitute(eq.rhs, sub) for eq in rem_eqs]
-        g_oop, g_ip = build_function(rem_formulas, state_syms, input_syms, param_syms, ios.system.iv; expression = expression)
+        g_oop, g_ip = build_function(rem_formulas, state_syms, input_syms, param_syms, get_iv(ios); expression = expression)
     end
 
     return (f_oop=f_oop, f_ip=f_ip,

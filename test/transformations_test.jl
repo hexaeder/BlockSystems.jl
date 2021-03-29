@@ -1,6 +1,7 @@
 using Test
 using BlockSystems
 using ModelingToolkit
+using ModelingToolkit: get_iv, get_eqs, get_states
 using LightGraphs
 
 # ordering and simplification should not matter for equity of equations!
@@ -175,7 +176,7 @@ end
                D(B₊x1) ~ b * in3,
                D(B₊x2) ~ in4,
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
-        @test eqs == iob.system.eqs
+        @test eqs == get_eqs(iob.system)
         @test iob.removed_eqs == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
 
         @testset "test rename_vars" begin
@@ -189,7 +190,7 @@ end
                    D(B₊x1) ~ b * in3,
                    D(B₊x2) ~ in4,
                    outN ~ (y + A₊x2) + (B₊x1 + B₊x2)]
-            @test eqs == new.system.eqs
+            @test eqs == get_eqs(new.system)
             @test new.removed_eqs == [A₊o ~ y + A₊x2, B₊o ~ B₊x1 + B₊x2]
         end
     end
@@ -221,14 +222,14 @@ end
         @test Set(subsys.removed_states) == Set()
 
         subsysA = connect_system(subsys)
-        @test subsysA.system.eqs == [D(x) ~ x]
+        @test get_eqs(subsysA.system) == [D(x) ~ x]
         @test Set(subsysA.removed_states) == Set([o])
         @test subsysA.removed_eqs == [o ~ x]
 
         subsysB = IOBlock(subsysA, name=:B)
         @test subsysB.name == :B
         @test subsysB.system.name == :B
-        @test subsysB.system.eqs == [D(x) ~ x]
+        @test get_eqs(subsysB.system) == [D(x) ~ x]
         @test Set(subsysB.removed_states) == Set([o])
         @test subsysB.removed_eqs == [o ~ x]
 
@@ -250,7 +251,8 @@ end
         # psst, i'm putting a test for function_generation here, don't tell ma
         gen = generate_io_function(systemblock,
                                    f_states=[systemblock.A₊x, systemblock.B₊x],
-                                   f_rem_states=[systemblock.A₊o, systemblock.B₊o])
+                                   f_rem_states=[systemblock.A₊o, systemblock.B₊o],
+                                   warn=false)
         @test Set(gen.states) == Set(Sym{Real}.([:B₊x, :A₊x, :add₊o]))
         @test Set(gen.inputs) == Set()
         @test Set(gen.params) == Set()
