@@ -250,7 +250,8 @@ end
         # psst, i'm putting a test for function_generation here, don't tell ma
         gen = generate_io_function(systemblock,
                                    f_states=[systemblock.A₊x, systemblock.B₊x],
-                                   f_rem_states=[systemblock.A₊o, systemblock.B₊o])
+                                   f_rem_states=[systemblock.A₊o, systemblock.B₊o],
+                                   warn=false)
         @test Set(gen.states) == Set(Sym{Real}.([:B₊x, :A₊x, :add₊o]))
         @test Set(gen.inputs) == Set()
         @test Set(gen.params) == Set()

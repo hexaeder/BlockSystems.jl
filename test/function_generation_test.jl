@@ -91,7 +91,7 @@ using LinearAlgebra
         D = Differential(t)
         iob = IOBlock([D(x) ~ a*i, D(y) ~ x], [i], [x, y])
 
-        iof = generate_io_function(iob);
+        iof = generate_io_function(iob, warn=false);
         @test iof.massm == I
         @test isequal(iof.inputs, [Sym{Real}(:i)])
         @test isequal(iof.states, Sym{Real}.([:x, :y]))
@@ -106,9 +106,9 @@ using LinearAlgebra
         iof.f_ip(a, [-1,1], [4], [-1], 0)
         @test a == [-4, -1]
 
-        iof = generate_io_function(iob, f_states=[y])
+        iof = generate_io_function(iob, f_states=[y], warn=false)
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
-        iof = generate_io_function(iob, f_states=[iob.y])
+        iof = generate_io_function(iob, f_states=[iob.y], warn=false)
         @test isequal(iof.states, Sym{Real}.([:y, :x]))
     end
 
@@ -118,7 +118,7 @@ using LinearAlgebra
         D = Differential(t)
         iob = IOBlock([x ~ a*i1, y ~ i2], [i1, i2], [x, y])
 
-        iof = generate_io_function(iob);
+        iof = generate_io_function(iob, warn=false);
 
         @test isequal(iof.inputs, Sym{Real}.([:i1, :i2]))
         @test isequal(iof.states, Sym{Real}.([:x, :y]))
@@ -141,35 +141,35 @@ using LinearAlgebra
 
         allequal(v1, v2) = all([isequal(e1, e2) for (e1, e2) ∈ zip(v1, v2)])
 
-        gen = generate_io_function(iob, f_states=[o1, o2])
+        gen = generate_io_function(iob, f_states=[o1, o2], warn=false)
         @test allequal(gen.states, makesym.([o1, o2], states=[]))
-        gen = generate_io_function(iob, f_states=[o2, o1])
+        gen = generate_io_function(iob, f_states=[o2, o1], warn=false)
         @test allequal(gen.states, makesym.([o2, o1], states=[]))
 
-        gen = generate_io_function(iob, f_inputs=[i1, i2])
+        gen = generate_io_function(iob, f_inputs=[i1, i2], warn=false)
         @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
-        gen = generate_io_function(iob, f_inputs=[i2, i1])
+        gen = generate_io_function(iob, f_inputs=[i2, i1], warn=false)
         @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
 
-        gen = generate_io_function(iob, f_params=[a, b])
+        gen = generate_io_function(iob, f_params=[a, b], warn=false)
         @test allequal(gen.params, makesym.([a, b], states=[]))
-        gen = generate_io_function(iob, f_params=[b, a])
+        gen = generate_io_function(iob, f_params=[b, a], warn=false)
         @test allequal(gen.params, makesym.([b, a], states=[]))
 
         # test with Symbols
-        gen = generate_io_function(iob, f_states=[:o1, :o2])
+        gen = generate_io_function(iob, f_states=[:o1, :o2], warn=false)
         @test allequal(gen.states, makesym.([o1, o2], states=[]))
-        gen = generate_io_function(iob, f_states=[:o2, :o1])
+        gen = generate_io_function(iob, f_states=[:o2, :o1], warn=false)
         @test allequal(gen.states, makesym.([o2, o1], states=[]))
 
-        gen = generate_io_function(iob, f_inputs=[:i1, :i2])
+        gen = generate_io_function(iob, f_inputs=[:i1, :i2], warn=false)
         @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
-        gen = generate_io_function(iob, f_inputs=[:i2, :i1])
+        gen = generate_io_function(iob, f_inputs=[:i2, :i1], warn=false)
         @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
 
-        gen = generate_io_function(iob, f_params=[a, :b])
+        gen = generate_io_function(iob, f_params=[a, :b], warn=false)
         @test allequal(gen.params, makesym.([a, b], states=[]))
-        gen = generate_io_function(iob, f_params=[:b, a])
+        gen = generate_io_function(iob, f_params=[:b, a], warn=false)
         @test allequal(gen.params, makesym.([b, a], states=[]))
     end
 end
