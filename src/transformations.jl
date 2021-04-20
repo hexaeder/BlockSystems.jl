@@ -10,7 +10,7 @@ Recursively transform `IOSystems` to `IOBlocks`.
 - try to eliminate explicit algebraic equations (i.e. outputs of internal blocks) by substituting each occurrence
   with their rhs. Explicit algebraic states which are marked as system outputs won't be removed.
 
-Parameters:
+Arguments:
 - `ios`: system to connect
 - `verbose=false`: toggle verbosity (show equations at different steps)
 - `simplify_eqs=true`: toggle simplification of all equations at the end

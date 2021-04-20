@@ -3,7 +3,7 @@ module BlockSystems
 using LinearAlgebra
 using DocStringExtensions
 using ModelingToolkit
-using ModelingToolkit: Parameter, ODESystem, Differential
+using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
 using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
@@ -171,7 +171,7 @@ ModelingToolkit.get_iv(sys::IOSystem) = get_iv(first(sys.systems))
 $(SIGNATURES)
 
 Construct a new IOSystem from various subsystems.
-Parameters
+Arguments:
  - `cons`: the connections in the form `sub1.output => sub2.input`
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings

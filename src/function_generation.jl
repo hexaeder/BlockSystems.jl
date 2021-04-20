@@ -7,7 +7,7 @@ Generate callable functions for an `AbstractIOSystem`. An `IOSystem` will be tra
 At this level there is no more distinction between internal states and outputs:
 `states=(istates ∪ outputs)`.
 
-Parameters:
+Arguments:
 - `ios`: the system to build the function
 optional:
 - `type=:auto`: `:ode` or `:static`, determines the output of the function
