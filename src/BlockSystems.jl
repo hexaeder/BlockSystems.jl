@@ -5,9 +5,10 @@ using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
-using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, makesym
+using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
-using SymbolicUtils: Symbolic, operation
+using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
+using ModelingToolkit.Symbolics: tosymbol
 using LightGraphs
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv
@@ -94,7 +95,8 @@ ModelingToolkit.get_iv(block::IOBlock) = get_iv(block.system)
 function namespace_rem_eqs(iob::IOBlock)
     eqs = iob.removed_eqs
     isempty(eqs) && return Equation[]
-    map(eq->namespace_equation(eq, iob.name, get_iv(iob)), eqs)
+
+    map(eq->namespace_equation(eq, iob.system), eqs)
 end
 
 """

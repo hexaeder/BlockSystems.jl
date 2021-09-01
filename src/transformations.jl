@@ -82,7 +82,7 @@ without these states.
 """
 function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=false)
     neweqs = deepcopy(eqs)
-    sys = ODESystem(neweqs, iv) # will be used for the dependency graph
+    sys = ODESystem(neweqs, iv; name=:tmp) # will be used for the dependency graph
     neweqs = get_eqs(sys) # the ODESystem might reorder the equations
     # generate dependency graph
     graph = eqeq_dependencies(asgraph(sys), variable_dependencies(sys))

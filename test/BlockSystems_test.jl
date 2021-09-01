@@ -38,9 +38,9 @@ using LightGraphs
         @test_throws ArgumentError IOBlock(eqs, [x1], [o1,o2])
         @test_throws ArgumentError IOBlock(eqs, [i1,i2], [i1,o1,o2])
 
-        @parameters i a
-        @variables x o
-        sys = ODESystem( [D(x) ~ a * i] )
+        @parameters i a(t)
+        @variables x(t) o(t)
+        sys = ODESystem( [D(x) ~ a * i], name=:foo)
         aeq = [i ~ 2*a + i1]
         @test_throws ArgumentError IOBlock(:name, [i.val], [a.val], [], [x.val], sys, aeq)
     end

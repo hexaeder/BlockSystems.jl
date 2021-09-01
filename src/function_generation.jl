@@ -93,10 +93,10 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     end
 
     # substitute x(t) by x for all terms
-    state_syms = makesym.(states, states=[])
-    input_syms = makesym.(inputs, states=[])
-    param_syms = makesym.(params, states=[])
-    rem_state_syms = makesym.(rem_states, states=[])
+    state_syms = strip_iv(states, get_iv(ios))
+    input_syms = strip_iv(inputs, get_iv(ios))
+    param_syms = strip_iv(params, get_iv(ios))
+    rem_state_syms = strip_iv(rem_states, get_iv(ios))
 
     sub = merge(Dict(states .=> state_syms),
                 Dict(inputs .=> input_syms),
@@ -129,6 +129,24 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
             g_oop=g_oop, g_ip=g_ip,
             rem_states=rem_state_syms)
 end
+
+"""
+    strip_iv(x, iv)
+
+Strip functional dependency of the independent variable `x(iv) -> x`.
+"""
+function strip_iv(x::Symbolic, iv::Symbolic)
+    if istree(x) && operation(x) isa Sym
+        if (length(arguments(x)) != 1 || !isequal(arguments(x)[1], iv))
+            error("Don't knowhow to handle expression $x")
+        end
+        return Sym{SymbolicUtils.symtype(x)}(tosymbol(operation(x)))
+    else
+        return x
+    end
+end
+strip_iv(x::Num, iv::Num) = Num(strip_iv(value(x), value(iv)))
+strip_iv(xv::Vector, iv) = map(x->strip_iv(x, iv), xv)
 
 """
     prepare_f_vector(iob, vector)

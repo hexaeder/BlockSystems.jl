@@ -3,6 +3,8 @@ using BlockSystems
 using ModelingToolkit
 using ModelingToolkit: get_iv, get_eqs, get_states
 using LinearAlgebra
+using ModelingToolkit.Symbolics
+Symbolics
 
 @info "Testes of function_generation.jl"
 
@@ -86,6 +88,18 @@ using LinearAlgebra
         @test !all_static(eqs)
     end
 
+    @testset "test strip_iv" begin
+        @parameters t a(t) b a
+        @variables x(t) y(t) z
+        using BlockSystems: strip_iv
+        @test isequal(strip_iv(t, t), t)
+        @test isequal(strip_iv(b, t), b)
+        @test isequal(strip_iv(z, t), z)
+        @test isequal(strip_iv(x, t), Sym{Real}(:x))
+        @test isequal(strip_iv(y, t), Sym{Real}(:y))
+        @test isequal(strip_iv(a, t), Sym{Real}(:a))
+    end
+
     @testset "ode function generation" begin
         @parameters t a i(t)
         @variables x(t) y(t)
@@ -132,7 +146,7 @@ using LinearAlgebra
     end
 
     @testset "parameter ordering" begin
-        using ModelingToolkit: makesym
+        using ModelingToolkit.Symbolics: tosymbol
 
         @parameters t a b i1(t) i2(t)
         @variables o1(t) o2(t)
@@ -143,34 +157,35 @@ using LinearAlgebra
         allequal(v1, v2) = all([isequal(e1, e2) for (e1, e2) ∈ zip(v1, v2)])
 
         gen = generate_io_function(iob, f_states=[o1, o2], warn=false)
-        @test allequal(gen.states, makesym.([o1, o2], states=[]))
+        @test allequal(gen.states, strip_iv([o1, o2], t))
+
         gen = generate_io_function(iob, f_states=[o2, o1], warn=false)
-        @test allequal(gen.states, makesym.([o2, o1], states=[]))
+        @test allequal(gen.states, strip_iv([o2, o1], t))
 
         gen = generate_io_function(iob, f_inputs=[i1, i2], warn=false)
-        @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
+        @test allequal(gen.inputs, strip_iv([i1, i2], t))
         gen = generate_io_function(iob, f_inputs=[i2, i1], warn=false)
-        @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
+        @test allequal(gen.inputs, strip_iv([i2, i1], t))
 
         gen = generate_io_function(iob, f_params=[a, b], warn=false)
-        @test allequal(gen.params, makesym.([a, b], states=[]))
+        @test allequal(gen.params, strip_iv([a, b], t))
         gen = generate_io_function(iob, f_params=[b, a], warn=false)
-        @test allequal(gen.params, makesym.([b, a], states=[]))
+        @test allequal(gen.params, strip_iv([b, a], t))
 
         # test with Symbols
         gen = generate_io_function(iob, f_states=[:o1, :o2], warn=false)
-        @test allequal(gen.states, makesym.([o1, o2], states=[]))
+        @test allequal(gen.states, strip_iv([o1, o2], t))
         gen = generate_io_function(iob, f_states=[:o2, :o1], warn=false)
-        @test allequal(gen.states, makesym.([o2, o1], states=[]))
+        @test allequal(gen.states, strip_iv([o2, o1], t))
 
         gen = generate_io_function(iob, f_inputs=[:i1, :i2], warn=false)
-        @test allequal(gen.inputs, makesym.([i1, i2], states=[]))
+        @test allequal(gen.inputs, strip_iv([i1, i2], t))
         gen = generate_io_function(iob, f_inputs=[:i2, :i1], warn=false)
-        @test allequal(gen.inputs, makesym.([i2, i1], states=[]))
+        @test allequal(gen.inputs, strip_iv([i2, i1], t))
 
         gen = generate_io_function(iob, f_params=[a, :b], warn=false)
-        @test allequal(gen.params, makesym.([a, b], states=[]))
+        @test allequal(gen.params, strip_iv([a, b], t))
         gen = generate_io_function(iob, f_params=[:b, a], warn=false)
-        @test allequal(gen.params, makesym.([b, a], states=[]))
+        @test allequal(gen.params, strip_iv([b, a], t))
     end
 end
