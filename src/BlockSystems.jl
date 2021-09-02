@@ -113,12 +113,12 @@ D = Differential(t)
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock))
-    IOBlock(name, eqs, inputs, outputs, Equation[])
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing)
+    IOBlock(name, eqs, inputs, outputs, Equation[]; iv)
 end
 
-function IOBlock(name, eqs, inputs, outputs, rem_eqs)
-    os = ODESystem(eqs, name = name)
+function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing)
+    os = ODESystem(eqs, iv; name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
     outputs = value.(outputs) # gets the outputs as `tern` type

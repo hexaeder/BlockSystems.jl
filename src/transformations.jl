@@ -65,7 +65,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     end
 
     try
-        IOBlock(ios.name, promoted_eqs, ios.inputs, ios.outputs, removed_eqs)
+        IOBlock(ios.name, promoted_eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios))
     catch e
         @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs removed_eqs
         throw(e)
@@ -135,6 +135,7 @@ julia> remove_algebraic_states(eqs)
 ```
 """
 function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
+    # FIXME: implicit euqations x ~ a+b which constraint a and b might be wrongly reduced if x not used elsewhere!
     reduced_eqs = deepcopy(eqs)
 
     # only consider states for reduction which are explicit algebraic and not in skip
@@ -230,5 +231,5 @@ function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
     inputs  = map(x->substitute(x, subs), blk.inputs)
     outputs = map(x->substitute(x, subs), blk.outputs)
-    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs)
+    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk))
 end
