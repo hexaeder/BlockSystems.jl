@@ -142,7 +142,6 @@ space_controller = IOSystem([prop_c.o => spacecraft.F, spacecraft.x => prop_c.fe
 space_controller = connect_system(space_controller)
 @info "Variables of space_controller" space_controller get_eqs(space_controller.system)
 
-
 #=
 ## Simulate System
 In order to simulate the system we can have to build the Julia functions.

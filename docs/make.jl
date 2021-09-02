@@ -1,3 +1,4 @@
+using Pkg; Pkg.develop(path=dirname(@__DIR__))
 using Documenter
 using Literate
 
@@ -13,9 +14,9 @@ using NetworkDynamics
 # generate examples
 examples = [
     joinpath(@__DIR__, "..", "examples", "spacecraft.jl"),
-    # joinpath(@__DIR__, "..", "examples", "kuramoto_network.jl"),
+    joinpath(@__DIR__, "..", "examples", "kuramoto_network.jl"),
     joinpath(@__DIR__, "..", "examples", "kuramoto_without_nd.jl"),
-    joinpath(@__DIR__, "..", "examples", "pd_node.jl"),
+    # joinpath(@__DIR__, "..", "examples", "pd_node.jl"),
 ]
 OUTPUT = joinpath(@__DIR__, "src/generated")
 isdir(OUTPUT) && rm(OUTPUT, recursive=true)
@@ -39,8 +40,8 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Examples" => ["Spacecraft" => "generated/spacecraft.md",
-                       "PowerDynamics.jl Node" => "generated/pd_node.md",
-                       # "Kuramoto Network" => "generated/kuramoto_network.md",
+                       # "PowerDynamics.jl Node" => "generated/pd_node.md",
+                       "Kuramoto Network" => "generated/kuramoto_network.md",
                        "Kuramoto without ND.jl" => "generated/kuramoto_without_nd.md"]
     ],
 )

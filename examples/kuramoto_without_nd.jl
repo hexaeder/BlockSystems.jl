@@ -46,11 +46,20 @@ function gen_edge_block(name)
     IOBlock([out ~ K*sin(src-dst)], [src, dst], [out], name=Symbol(name))
 end
 
+## append subscript, `sybscript(:foo, 2) => :foo₂`
+subscript(s, i) = Symbol(s, Char(0x02080 + i))
+
 function gen_vertex_block(n_edges, name)
     @parameters t ω
-    @parameters edge[1:n_edges](t)
     @variables ϕ(t)
     D = Differential(t)
+    ## the way array variables work changed. This is a hack to retrieve the old behvaviour of
+    ## this closely mimics the old @parameters edge[1:n_edges](t)
+    edge = Num[]
+    for i in 1:n_edges
+        symname = subscript(:edge, i)
+        append!(edge, @parameters $symname(t))
+    end
 
     IOBlock([D(ϕ) ~ ω + (+)(edge...)],
             [edge...],
@@ -98,7 +107,7 @@ for i in vertices(g)
     ## we need to connect the outputs of the edge-blocks to the
     ## inputs of the node like edge_j_to_1.out => node.edge₁
     for (i, edge) in enumerate(edges)
-        node_input_i = getproperty(node, Symbol("edge", Char(0x02080 + i)))
+        node_input_i = getproperty(node, subscript(:edge, i))
         push!(connections, edge.block.out => node_input_i)
     end
 end
