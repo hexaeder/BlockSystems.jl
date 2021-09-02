@@ -62,11 +62,13 @@ struct IOBlock <: AbstractIOSystem
     function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs)
         @check name == odes.name "Name of inner ODESystem does not match name of IOBlock"
         @check Set(inputs) ⊆ Set(parameters(odes)) "inputs must be parameters"
-        @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
+        # XXX: temp. disable check: outputs may be completely implicit at block level
+        # @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
         @check Set(iparams) ⊆ Set(parameters(odes)) "iparams must be parameters"
         @check Set(istates) ⊆ Set(states(odes)) "istates must be variables"
         @check Set(inputs ∪ iparams) == Set(parameters(odes)) "inputs ∪ iparams != params"
-        @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
+        # XXX: see above
+        # @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
         additional_vars = get_variables([eq.rhs for eq in rem_eqs])
         all_vars = vcat(inputs, outputs, istates, iparams, get_iv(odes))
