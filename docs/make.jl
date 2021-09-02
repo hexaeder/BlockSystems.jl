@@ -1,4 +1,7 @@
 using Pkg; Pkg.develop(path=dirname(@__DIR__))
+# headless GK to fix ci
+ENV["GKSwstype"] = "100"
+
 using Documenter
 using Literate
 
