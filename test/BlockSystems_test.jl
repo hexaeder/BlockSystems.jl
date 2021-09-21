@@ -1,7 +1,7 @@
 using Test
 using BlockSystems
 using ModelingToolkit
-using ModelingToolkit: get_iv, get_eqs, get_states
+using ModelingToolkit: get_iv, get_eqs, get_states, value
 using LightGraphs
 
 @info "Tests of BlockSystems.jl"
@@ -46,7 +46,6 @@ using LightGraphs
     end
 
     @testset "test of create_namespace_promotions" begin
-        using ModelingToolkit: value
         using BlockSystems: create_namespace_promotions
         @parameters t
         Aa, Ba, Ab, Bc = value.(@parameters A₊a B₊a(t) A₊b B₊c)
@@ -290,6 +289,7 @@ using LightGraphs
     end
 
     @testset "test BlockSpec" begin
+        # test the constructors
         @parameters t
         @parameters uᵢ(t) uᵣ(t)
         @variables x(t) iᵢ(t) iᵣ(t)
@@ -316,7 +316,22 @@ using LightGraphs
                                          iob1.uᵢ => uᵢ,
                                          iob1.uᵣ => uᵣ])
 
-        @test bs1(sys1) == false
-        @test bs1(sys2) == true
+        @test BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])(sys1) == false # no name promotion
+        @test BlockSpec([:uᵣ, :uᵢ], [:iᵣ, :iᵢ])(sys2) == false # to much inputs
+
+        # test the strict stuff
+        @parameters t
+        @parameters i1(t) i2(t)
+        @variables o1(t) o2(t)
+        iob = IOBlock([o1 ~ i1, o2 ~ i2], [i1, i2], [o1, o2], iv=t)
+
+        @test BlockSpec([:i1, :i2], [:o1])(iob) == true
+        @test BlockSpec([:i1, :i2], [:o1], in_strict=1, out_strict=1)(iob) == false
+        @test BlockSpec([:i1], [:o1], in_strict=1, out_strict=1)(iob) == false
+        @test BlockSpec([:i1], [:o1], in_strict=0, out_strict=0)(iob) == true
+
+        @test BlockSpec([:i1], [:o1, :o2])(iob) == false
+        @test BlockSpec([:i1], [:o1, :o2], in_strict=0, out_strict=0)(iob) == true
+        @test BlockSpec([:i1], [:o1, :o2], in_strict=0, out_strict=1)(iob) == true
     end
 end
