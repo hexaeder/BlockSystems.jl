@@ -14,8 +14,14 @@ Arguments:
 - `ios`: system to connect
 - `verbose=false`: toggle verbosity (show equations at different steps)
 - `simplify_eqs=true`: toggle simplification of all equations at the end
+- `remove_superflous=true`: toggle whether the system should try to get rid of unused states
+- `remove_algebraic=true`: toggle whether the algorithm tries to get rid of explicit algebraic equations
 """
-function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
+function connect_system(ios::IOSystem;
+                        verbose=false,
+                        simplify_eqs=true,
+                        remove_superflous=false,
+                        remove_algebraic=true)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -38,22 +44,27 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
 
     verbose && @info "substitute inputs with outputs" eqs
 
-    # get red of unused states
-    # (internal variables which are not used for the outputs)
+    reduced_eqs = copy(eqs)
     nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
-    reduced_eqs1 = remove_superfluous_states(eqs, get_iv(ios), nspcd_outputs; verbose)
-    verbose && @info "without superfluous states" reduced_eqs1
+    if remove_superflous
+        # get red of unused states
+        # (internal variables which are not used for the outputs)
+        reduced_eqs = remove_superfluous_states(eqs, get_iv(ios), nspcd_outputs; verbose)
+        verbose && @info "without superfluous states" reduced_eqs
+    end
 
-    # reduce algebraic states of the system
-    (reduced_eqs2, new_rem_eqs) = remove_algebraic_states(reduced_eqs1, skip = nspcd_outputs)
-    verbose && @info "without explicit algebraic states" reduced_eqs2 new_rem_eqs
+    if remove_algebraic
+        # reduce algebraic states of the system
+        (reduced_eqs, new_rem_eqs) = remove_algebraic_states(reduced_eqs, skip = nspcd_outputs)
+        verbose && @info "without explicit algebraic states" reduced_eqs new_rem_eqs
 
-    # add all of the removed_eqs of the subsystem
-    removed_eqs = vcat(new_rem_eqs, removed_eqs)
+        # add all of the removed_eqs of the subsystem
+        removed_eqs = vcat(new_rem_eqs, removed_eqs)
+    end
 
     # apply the namespace transformations
     promotion_rules = ios.namespace_map
-    promoted_eqs = map(eq->eqsubstitute(eq, promotion_rules), reduced_eqs2)
+    promoted_eqs = map(eq->eqsubstitute(eq, promotion_rules), reduced_eqs)
     removed_eqs  = map(eq->eqsubstitute(eq, promotion_rules), removed_eqs)
 
     verbose && @info "promoted namespaces" promoted_eqs removed_eqs
@@ -67,7 +78,7 @@ function connect_system(ios::IOSystem; verbose=false, simplify_eqs=true)
     try
         IOBlock(ios.name, promoted_eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios))
     catch e
-        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs1 reduced_eqs2 promoted_eqs removed_eqs
+        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs promoted_eqs removed_eqs
         throw(e)
     end
 end
