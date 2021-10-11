@@ -8,7 +8,7 @@ An input-output-system is characterized by a set of equations. These equations c
 either first order ODEs or explicit algebraic equations.
 ```math
 \begin{aligned}
-\dot \mathbf x(t) &= f(\mathbf x(t), \mathbf y(t), \mathbf i(t), p)\\
+\dot{\mathbf x}(t) &= f(\mathbf x(t), \mathbf y(t), \mathbf i(t), p)\\
 \mathbf y(t) &= g(\mathbf x(t), \mathbf y(t), \mathbf i(t), p)
 \end{aligned}
 ```
