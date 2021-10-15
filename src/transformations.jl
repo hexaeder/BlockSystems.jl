@@ -1,4 +1,4 @@
-export connect_system, rename_vars
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
 
 """
 $(SIGNATURES)
@@ -13,15 +13,17 @@ Recursively transform `IOSystems` to `IOBlocks`.
 Arguments:
 - `ios`: system to connect
 - `verbose=false`: toggle verbosity (show equations at different steps)
+- `remove_superflous_states=true`: toggle whether the system should try to get rid of unused states
+- `substitute_algebraic_states=true`: toggle whether the algorithm tries to get rid of explicit algebraic equations
+- `substitute_derivatives=true`: toggle whether to expand all derivatives and try to substitute them
 - `simplify_eqs=true`: toggle simplification of all equations at the end
-- `remove_superflous=true`: toggle whether the system should try to get rid of unused states
-- `remove_algebraic=true`: toggle whether the algorithm tries to get rid of explicit algebraic equations
 """
 function connect_system(ios::IOSystem;
                         verbose=false,
                         simplify_eqs=true,
-                        remove_superflous=false,
-                        remove_algebraic=true)
+                        remove_superflous_states=false,
+                        substitute_algebraic_states=true,
+                        substitute_derivatives=true)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -44,55 +46,49 @@ function connect_system(ios::IOSystem;
 
     verbose && @info "substitute inputs with outputs" eqs
 
-    reduced_eqs = copy(eqs)
-    nspcd_outputs = [findfirst(v->isequal(v, o), ios.namespace_map) for o in ios.outputs]
-    if remove_superflous
-        # get red of unused states
-        # (internal variables which are not used for the outputs)
-        reduced_eqs = remove_superfluous_states(eqs, get_iv(ios), nspcd_outputs; verbose)
-        verbose && @info "without superfluous states" reduced_eqs
-    end
-
-    if remove_algebraic
-        # reduce algebraic states of the system
-        (reduced_eqs, new_rem_eqs) = remove_algebraic_states(reduced_eqs, skip = nspcd_outputs)
-        verbose && @info "without explicit algebraic states" reduced_eqs new_rem_eqs
-
-        # add all of the removed_eqs of the subsystem
-        removed_eqs = vcat(new_rem_eqs, removed_eqs)
-    end
-
     # apply the namespace transformations
     promotion_rules = ios.namespace_map
-    promoted_eqs = map(eq->eqsubstitute(eq, promotion_rules), reduced_eqs)
+    eqs = map(eq->eqsubstitute(eq, promotion_rules), eqs)
     removed_eqs  = map(eq->eqsubstitute(eq, promotion_rules), removed_eqs)
 
-    verbose && @info "promoted namespaces" promoted_eqs removed_eqs
+    block = IOBlock(ios.name, eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios))
+
+    if remove_superflous_states
+        block = BlockSystems.remove_superflous_states(block; verbose)
+    end
+
+    if substitute_algebraic_states
+        block = BlockSystems.substitute_algebraic_states(block; verbose)
+    end
+
+    if substitute_derivatives
+        block = BlockSystems.substitute_derivatives(block; verbose)
+    end
 
     if simplify_eqs
-        promoted_eqs = simplify.(promoted_eqs)
-        removed_eqs = simplify.(removed_eqs)
-        verbose && @info "simplified equations" promoted_eqs removed_eqs
+        block = BlockSystems.simplify_eqs(block)
     end
 
-    try
-        IOBlock(ios.name, promoted_eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios))
-    catch e
-        @error "Failed to build IOBlock from System" ios.inputs ios.outputs ios.name eqs reduced_eqs promoted_eqs removed_eqs
-        throw(e)
-    end
+    return block
 end
 
-"""
-    remove_superfluous_states(eqs::Vector{Equation}, iv, outputs)
 
-This function removes equations, which are not used in order to generate the
-given `outputs`. It looks for equations which have no path to the `outputs`
-equations in the dependency graph. Returns a new, reduced set of equations
-without these states.
 """
-function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=false)
-    neweqs = deepcopy(eqs)
+    remove_superfluous_states(iob::IOBlock; verbose=false)
+
+This function removes equations from block, which are not used in order to
+generate the outputs. It looks for equations which have no path to the outputs
+equations in the dependency graph. Returns a new IOBlock.
+
+The removed equations will be not avaiblable as removed quations of the new IOBlock
+
+TODO: Maybe we should try to reduce the inputs to.
+"""
+function remove_superfluous_states(iob::IOBlock; verbose=false)
+    iv = get_iv(iob)
+    outputs = iob.outputs
+
+    neweqs = deepcopy(equations(iob))
     sys = ODESystem(neweqs, iv; name=:tmp) # will be used for the dependency graph
     neweqs = get_eqs(sys) # the ODESystem might reorder the equations
     # generate dependency graph
@@ -116,43 +112,27 @@ function remove_superfluous_states(eqs::Vector{Equation}, iv, outputs; verbose=f
     removed_eqs = neweqs[removable]
     deleteat!(neweqs, sort(removable))
 
-    return neweqs
+    verbose && @info "Removed superflous states with equations" removed_eqs
+
+    IOBlock(iob.name, neweqs, iob.inputs, iob.outputs, iob.removed_eqs; iv)
 end
 
+
 """
-    remove_algebraic_states(eqs:Vector{Equation}, skip=[])
+    substitute_algebraic_states(iob::IOBlock; verbose=false)
 
 Reduces the number of equations by substituting explicit algebraic equations.
-Returns a tuple containing two `Vector{Equations}`
-  - the new equations with substituted states
-  - the algebraic states which have been removed
-
-The optional skip argument is used to declare states which should not be removed.
-
-This function checks for cyclic dependencies between algebraic equations by generating
-a dependency graph between them. All substitutions have to be pairwise cycle free.
-```example
-julia> @variables i x y o1 o2;
-julia> D = Differential(t);
-julia> eqs = [D(x) ~ i,
-              o1 ~ x + o2,
-              D(y) ~ i,
-              o2 ~ y + o1];
-julia> remove_algebraic_states(eqs)
-(Equation[Equation((D'~t)(x), i),
-          Equation(o1, x + (o1 + y)),
-          Equation((D'~t)(y), i)],
- Equation[Equation(o2, o1 + y)])
-```
+Returns a new IOBlock with the reduced equations. The removed eqs are stored
+together with the previous `removed_eqs` in the new IOBlock.
+Won't reduce algebraic states which are labeld as `output`.
 """
-function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
-    # FIXME: implicit euqations x ~ a+b which constraint a and b might be wrongly reduced if x not used elsewhere!
-    reduced_eqs = deepcopy(eqs)
+function substitute_algebraic_states(iob::IOBlock; verbose=false)
+    reduced_eqs = deepcopy(equations(iob))
 
-    # only consider states for reduction which are explicit algebraic and not in skip
+    # only consider states for reduction which are explicit algebraic and not in outputs
     condition = eq -> begin
         (type, var) = eq_type(eq)
-        type == :explicit_algebraic && var ∉ Set(skip)
+        type == :explicit_algebraic && var ∉ Set(iob.outputs)
     end
     algebraic_idx = findall(condition, reduced_eqs)
 
@@ -169,7 +149,7 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
             end
         end
     end
-    removable = algebraic_idx[pairwise_cycle_free(g)]
+    removable = algebraic_idx[_pairwise_cycle_free(g)]
     @assert allunique(removable)
 
     rules = Dict(eq.lhs => eq.rhs for eq in reduced_eqs[removable])
@@ -178,20 +158,30 @@ function remove_algebraic_states(eqs::Vector{Equation}; skip=[])
         reduced_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
     end
 
-    removed_eqs = reduced_eqs[removable]
+    # also substitute in the allready removed_eqs
+    removed_eqs = deepcopy(iob.removed_eqs)
+    for (i, eq) in enumerate(removed_eqs)
+        removed_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
+    end
+
+    verbose && @info "Substituted algebraic states:" rules
+
+    # append the knows removed wqs with the newly removed eqs
+    append!(removed_eqs, reduced_eqs[removable])
+    # remove removable equations from reduced_eqs
     deleteat!(reduced_eqs, sort(removable))
 
-    return reduced_eqs, removed_eqs
+    IOBlock(iob.name, reduced_eqs, iob.inputs, iob.outputs, vcat(removed_eqs, iob.removed_eqs); iv=get_iv(iob))
 end
 
 """
-    pairwise_cycle_free(g:SimpleDiGraph)
+    _pairwise_cycle_free(g:SimpleDiGraph)
 
 Returns an array of vertices, which pairwise do not belong to any cycle in `g`.
 Uses `simplecycles` from `LightGraphs`. The algorithm starts with all vertices
 and iteratively removes the vertices is part of most cycles.
 """
-function pairwise_cycle_free(g::SimpleDiGraph)
+function _pairwise_cycle_free(g::SimpleDiGraph)
     idx = collect(vertices(g))
     cycles = simplecycles(g)
     while true
@@ -215,6 +205,57 @@ function pairwise_cycle_free(g::SimpleDiGraph)
     end
 end
 
+
+"""
+    substitute_derivatives(iob::IOBlock; verbose=false)
+
+Expand all derivatives in the RHS of the system. Try to substitute
+in the lhs with
+"""
+function substitute_derivatives(iob::IOBlock; verbose=false)
+    eqs = deepcopy(equations(iob))
+    rem_eqs = deepcopy(iob.removed_eqs)
+
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eq.lhs ~ expand_derivatives(eq.rhs)
+    end
+    for (i, eq) in enumerate(rem_eqs)
+        rem_eqs[i] = eq.lhs ~ expand_derivatives(eq.rhs)
+    end
+
+    substitutions = [eq.lhs => eq.rhs for eq in eqs if istree(eq.lhs) && operation(eq.lhs) isa Differential]
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+    end
+    for (i, eq) in enumerate(rem_eqs)
+        rem_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+    end
+
+    newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob))
+    if verbose
+        old = rhs_differentials(iob)
+        new = rhs_differentials(iob)
+        removed = setdiff(old, new)
+        @info "Substituted derivatives:" removed
+    end
+
+    return newblock
+end
+
+
+"""
+    simplify_eqs(iob::IOBlock)
+
+Simplify eqs and removed eqs and return new IOBlock.
+"""
+function simplify_eqs(iob::IOBlock; verbose=false)
+    verbose && @info "Simplify iob equations..."
+    simplified_eqs = simplify.(equations(iob))
+    simplified_rem_eqs = simplify.(iob.removed_eqs)
+    IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob))
+end
+
+
 """
     rename_vars(blk::IOBLock, kwargs...)
     rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
@@ -236,7 +277,6 @@ function rename_vars(blk::IOBlock; kwargs...)
     end
     rename_vars(blk, substitutions)
 end
-
 function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
     eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)

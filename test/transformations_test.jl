@@ -14,7 +14,7 @@ end
 
 @testset "transformations.jl" begin
     @testset "pairwise cycle free" begin
-        using BlockSystems: pairwise_cycle_free
+        using BlockSystems: _pairwise_cycle_free
         g = SimpleDiGraph(5)
         add_edge!(g, 1=>2)
         add_edge!(g, 2=>4)
@@ -24,7 +24,7 @@ end
         add_edge!(g, 2=>3)
         add_edge!(g, 5=>4)
         cycles = simplecycles(g)
-        @test pairwise_cycle_free(g) == [3,5]
+        @test _pairwise_cycle_free(g) == [3,5]
     end
 
     @testset "remove superfluous states" begin
@@ -35,34 +35,33 @@ end
         eqs = [D(x) ~ x,
                D(y) ~ y,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, t, [x])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [x]; iv=t)) |> equations
         @test reqs == eqs[[1]]
-        reqs = remove_superfluous_states(eqs, t, [y])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [y]; iv=t)) |> equations
         @test reqs == eqs[[2]]
-        reqs = remove_superfluous_states(eqs, t, [o])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [o]; iv=t)) |> equations
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ y,
                D(y) ~ x+o,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, t, [y])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [y]; iv=t)) |> equations
         @test reqs == eqs
-        reqs = remove_superfluous_states(eqs, t, [x])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [x]; iv=t)) |> equations
         @test reqs == eqs
-        reqs = remove_superfluous_states(eqs, t, [o])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [o]; iv=t)) |> equations
         @test reqs == eqs[[3]]
         eqs = [D(x) ~ x+o,
                D(y) ~ y,
                o ~ a^b]
-        reqs = remove_superfluous_states(eqs, t, [x])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [x]; iv=t)) |> equations
         @test reqs == eqs[[1,3]]
-        reqs = remove_superfluous_states(eqs, t, [y])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [y]; iv=t)) |> equations
         @test reqs == eqs[[2]]
-        reqs = remove_superfluous_states(eqs, t, [o])
+        reqs = remove_superfluous_states(IOBlock(eqs, [], [o]; iv=t)) |> equations
         @test reqs == eqs[[3]]
     end
 
     @testset "remove algebraic states" begin
-        using BlockSystems: remove_algebraic_states
         @parameters t a b i(t)
         @variables x(t) y(t) o(t) o1(t) o2(t)
         D = Differential(t)
@@ -70,64 +69,65 @@ end
         eqs = [D(x) ~ x + o,
                D(y) ~ y + o,
                o ~ a^b]
-        reqs = remove_algebraic_states(eqs)
-        @test reqs[1] == [D(x) ~ x + a^b,
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
+
+        @test equations(reqs) == [D(x) ~ x + a^b,
                           D(y) ~ y + a^b]
-        @test reqs[2] == [o ~ a^b]
+        @test reqs.removed_eqs == [o ~ a^b]
 
         # variable o1 and o2 can be removed
         eqs = [D(x) ~ x + o1+o2,
                D(y) ~ y + o2,
                o1 ~ a^b + o2,
                o2 ~ a-b]
-        reqs = remove_algebraic_states(eqs)
-        @test reqs[1] == [D(x) ~ x + a^b + a-b + a-b,
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
+        @test equations(reqs) == [D(x) ~ x + a^b + a-b + a-b,
                           D(y) ~ y + a-b]
-        @test reqs[2] == [o1 ~ a^b + a - b,
+        @test reqs.removed_eqs == [o1 ~ a^b + a - b,
                           o2 ~ a - b]
 
         eqs = [D(x) ~ i + o,
                o ~ x + i]
-        reqs = remove_algebraic_states(eqs)
-        @test reqs[1] == [D(x) ~ i + (x + i)]
-        @test reqs[2] == [o ~ x + i]
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x]))
+        @test equations(reqs) == [D(x) ~ i + (x + i)]
+        @test reqs.removed_eqs == [o ~ x + i]
 
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
-        reqs = remove_algebraic_states(eqs)
-        @test reqs[1] == [D(x) ~ i,
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
+        @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
                           o1 ~ x + (y + o1)]
-        @test reqs[2] == [o2 ~ y + o1]
+        @test reqs.removed_eqs == [o2 ~ y + o1]
 
-        rreqs = remove_algebraic_states(reqs[1])
-        @test rreqs[1] == reqs[1]
-        @test rreqs[2] == []
+        rreqs = substitute_algebraic_states(IOBlock(equations(reqs), [],[x,y]))
+        @test equations(rreqs) == equations(reqs)
+        @test reqs.removed_eqs == reqs.removed_eqs
 
         # test skip condition
         eqs = [D(x) ~ i + o,
                o ~ x + i]
-        reqs = remove_algebraic_states(eqs, skip=[o])
-        @test reqs[1] == eqs
-        @test reqs[2] == []
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,o]))
+        @test equations(reqs) == eqs
+        @test reqs.removed_eqs == []
 
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
                o2 ~ y + o1]
-        reqs = remove_algebraic_states(eqs, skip=[o1])
-        @test reqs[1] == [D(x) ~ i,
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o1]))
+        @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
                           o1 ~ x + (y + o1)]
-        @test reqs[2] == [o2 ~ y + o1]
+        @test reqs.removed_eqs == [o2 ~ y + o1]
 
-        reqs = remove_algebraic_states(eqs, skip=[o2])
-        @test reqs[1] == [D(x) ~ i,
+        reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o2]))
+        @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
                           o2 ~ y + (x + o2)]
-        @test reqs[2] == [o1 ~ x + o2]
+        @test reqs.removed_eqs == [o1 ~ x + o2]
     end
 
     @testset "test of connect_system" begin
@@ -263,5 +263,46 @@ end
         gen.g_ip(out, st, (), (), (), 0.0)
         @test out == st[1:2]
         @test gen.g_oop(st, (), (), (), 0.0) == st[1:2]
+    end
+
+    @testset "substitution of differential states" begin
+        # first block
+        @parameters t i(t)
+        @variables o(t)
+        D = Differential(t)
+        A = IOBlock([D(o) ~ 1 + D(i)], [i], [o])
+        @test length(BlockSystems.rhs_differentials(A)) == 1
+
+        # second block, does not contain derivative of output
+        @variables x(t)
+        @parameters a(t)
+        B = IOBlock([x ~ a + 1], [], [x])
+        @test length(BlockSystems.rhs_differentials(B)) == 0
+
+        # third block, contains derivative of output
+        @variables y(t)
+        @parameters b(t)
+        C = IOBlock([D(y) ~ b + 1], [], [y])
+        @test length(BlockSystems.rhs_differentials(B)) == 0
+
+        sysAB = IOSystem([B.x => A.i], [A, B]) |> connect_system
+        @test length(BlockSystems.rhs_differentials(sysAB)) == 1
+
+        sysAC = IOSystem([C.y => A.i], [A, C]) |> connect_system
+        @test length(BlockSystems.rhs_differentials(sysAC)) == 0
+
+        @test equations(sysAC.system) == [D(o) ~ 2 + b, D(y) ~ 1 + b]
+
+
+        # fouth block with more complex stuff
+        @variables x(t) y(t)
+        B = IOBlock([D(x) ~ a, y ~ x + 3], [], [y])
+
+        sysAB = IOSystem([B.y => A.i], [A, B]) |> connect_system
+
+        equations(sysAB)
+        # XXX: what happens here?
+        # well we need to explicitly substitute algebraic states inside differentials even
+        # if they are outputs!
     end
 end

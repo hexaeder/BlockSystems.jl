@@ -377,7 +377,7 @@ end
 """
 Helper function for `Base.show` for IOBlock and IOSystem
 """
-function print_variables(io::IO, V::Vector{Symbolic})
+function print_variables(io::IO, V)
     printmax = get(io, :compact, false) ? 3 : 7
     l = length(V)
     if l == 0
@@ -393,21 +393,26 @@ function print_variables(io::IO, V::Vector{Symbolic})
     end
 end
 
+"""
+    rhs_differentials(iob::IOBlock)
+
+Return Set of all differentials which are present in the rhs of the system.
+"""
 function rhs_differentials(iob::IOBlock)
-    diffs = SymbolicUtils.Symbolic[]
+    diffs = Set{SymbolicUtils.Symbolic}()
     for eq in equations(iob.system)
-        collect_differentials!(diffs, eq.rhs)
+        _collect_differentials!(diffs, eq.rhs)
     end
     return diffs
 end
 
-function collect_differentials!(found, ex)
+function _collect_differentials!(found, ex)
     if SymbolicUtils.istree(ex)
         if operation(ex) isa Differential
             push!(found, ex)
         else
             for arg in arguments(ex)
-                collect_differentials!(found, arg)
+                _collect_differentials!(found, arg)
             end
         end
     end
