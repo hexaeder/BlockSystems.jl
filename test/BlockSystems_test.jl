@@ -43,6 +43,16 @@ using LightGraphs
         sys = ODESystem( [D(x) ~ a * i], name=:foo)
         aeq = [i ~ 2*a + i1]
         @test_throws ArgumentError IOBlock(:name, [i.val], [a.val], [], [x.val], sys, aeq)
+
+        @parameters t a(t) p
+        @variables x(t) y(t)
+        D = Differential(t)
+        IOBlock([x ~ 2 + a], [], [x])
+        IOBlock([D(y) ~ 2 + a], [], [x])
+
+        @test_throws ArgumentError IOBlock([a ~ 2 + x], [], [x])
+        @test_throws ArgumentError IOBlock([p ~ 2 + x], [p], [x], iv=t)
+        @test_throws ArgumentError IOBlock([a ~ 2 + x], [a], [x], iv=t)
     end
 
     @testset "test of create_namespace_promotions" begin
