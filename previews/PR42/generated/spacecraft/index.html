@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Spacecraft · BlockSystems.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link rel="canonical" href="https://hexaeder.github.io/BlockSystems.jl/generated/spacecraft/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">BlockSystems.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Spacecraft</a><ul class="internal"><li><a class="tocitem" href="#Control-System:-Spaceship"><span>Control System: Spaceship</span></a></li><li><a class="tocitem" href="#Simple-proportional-controller"><span>Simple proportional controller</span></a></li><li><a class="tocitem" href="#Simulate-System"><span>Simulate System</span></a></li><li><a class="tocitem" href="#Defining-a-better-controller"><span>Defining a better controller</span></a></li><li><a class="tocitem" href="#Defining-an-PT1-controller"><span>Defining an PT1 controller</span></a></li></ul></li><li><a class="tocitem" href="../kuramoto_network/">Kuramoto Network</a></li><li><a class="tocitem" href="../kuramoto_without_nd/">Kuramoto without ND.jl</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Spacecraft</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Spacecraft</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/hexaeder/BlockSystems.jl/blob/master/examples/spacecraft.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="Control-System:-Spaceship"><a class="docs-heading-anchor" href="#Control-System:-Spaceship">Control System: Spaceship</a><a id="Control-System:-Spaceship-1"></a><a class="docs-heading-anchor-permalink" href="#Control-System:-Spaceship" title="Permalink"></a></h2><p>As an example we want to build an IOSystem controlling the altitude of a spacecraft. The spacecraft has mass <span>$m$</span> and can be controlled with thrusters which apply the force <span>$F(t)$</span> to the spacecraft. The altitude <span>$x(t)$</span></p><p class="math-container">\[\dot v(t) = \frac{ F(t) }{m}\\
+\dot x(t) =  v(t)\]</p><p>in our model this system has the input <span>$F(t)$</span>, the internal state <span>$v(t)$</span> (vertical velocity) and the output <span>$x(t)$</span>.</p><pre><code class="nohighlight hljs">       +------------+
+F(t) --| spacecraft |-- x(t)
+       | m, v(t)    |
+       +------------+
+</code></pre><pre><code class="language-julia hljs">using BlockSystems
+using ModelingToolkit
+@parameters t M F(t)
+@variables x(t) v(t)
+D = Differential(t)
+
+spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v], # define the equation
+                     [F], # inputs of the system
+                     [x], # outputs of the system
+                     name = :spacecraft)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">IOBlock :spacecraft with 2 eqs
+  ├ inputs:  F(t)
+  ├ outputs: x(t)
+  ├ istates: v(t)
+  └ iparams: M</code></pre><p>We want to model a controller which takes a desired altitude as an input parameter and outputs the force for thrusters.</p><h2 id="Simple-proportional-controller"><a class="docs-heading-anchor" href="#Simple-proportional-controller">Simple proportional controller</a><a id="Simple-proportional-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-proportional-controller" title="Permalink"></a></h2><p>A proportional controller takes an input <code>i</code> and calculates the output proportional to the input.</p><p class="math-container">\[ o(t) = K\cdot i(t)\]</p><pre><code class="nohighlight hljs">       +--------+
+i(t) --| prop K |-- o(t)
+       +--------+</code></pre><pre><code class="language-julia hljs">@parameters K i(t)
+@variables o(t)
+
+prop = IOBlock([o ~ K*i], [i], [o], name = :prop)</code></pre><p>In order to make this useful as an controller, the input has to be the difference between the reference and the system variable (negative feedback). We can model this as an IOSystem where</p><p class="math-container">\[Δ = p - m\,.\]</p><pre><code class="nohighlight hljs">       +--------+
+p(t) --|  diff  |-- Δ(t)
+m(t) --|        |
+       +--------+</code></pre><pre><code class="language-julia hljs">@parameters p(t) m(t)
+@variables Δ(t)
+diff = IOBlock([Δ ~ p - m], [p, m], [Δ], name=:diff)</code></pre><p>Now we can connect both of the defined models to create an proportional controller</p><pre><code class="nohighlight hljs">             +----------------------------------------+
+             | propc                                  |
+             |         +--------+   +--------+        |
+  target(t)--|--p(t) --|  diff  |---| prop K |--o(t)--|--o(t)
+feedback(t)--|--m(t) --|        |   +--------+        |
+             |         +--------+                     |
+             +----------------------------------------+</code></pre><p>If we don&#39;t provide additional information the system will try to promote all of the enclosed variables to the new systemwide namespace.</p><pre><code class="language-julia hljs">prop_c = IOSystem([diff.Δ =&gt; prop.i], # connect output of diff to input of prop
+                  [diff, prop], # subsystems
+                  name=:propc)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">IOSystem :propc with 2 subsystems
+  ├ diff: p(t), m(t) ↦ Δ(t)
+  └ prop: i(t) ↦ o(t)
+and 1 connections:
+  └ diff₊Δ(t) ⇒ prop₊i(t)
+inputs:
+  ├ diff₊p(t) ⇒ p(t)
+  └ diff₊m(t) ⇒ m(t)
+outputs:
+  ├ diff₊Δ(t) ⇒ Δ(t)
+  └ prop₊o(t) ⇒ o(t)
+istates: (empty)
+iparams:
+  └ prop₊K ⇒ K</code></pre><p>For finer control, it is often preferred to give new names manually, this is done with the <code>namespace_map</code> argument. Per default, all of the outputs of the subsystems will become outputs of the connected system (in this case also the output <code>diff.Δ</code>). We can prevent this by supplying the <code>outputs</code> argument manually. Sub outputs which are not referenced here will become internal states of the connected system.</p><p>The rhs of the namespace map can be given as a Variable/Parameter type from MTK. For simple renaming one can also give the rhs as a <code>Symbol</code> type.</p><pre><code class="language-julia hljs">prop_c = IOSystem([diff.Δ =&gt; prop.i], [diff, prop],
+                  namespace_map = [prop.o =&gt; o,
+                                   diff.p =&gt; :target,
+                                   diff.m =&gt; :feedback],
+                  outputs = [o],
+                  name=:propc)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">IOSystem :propc with 2 subsystems
+  ├ diff: p(t), m(t) ↦ Δ(t)
+  └ prop: i(t) ↦ o(t)
+and 1 connections:
+  └ diff₊Δ(t) ⇒ prop₊i(t)
+inputs:
+  ├ diff₊p(t) ⇒ target(t)
+  └ diff₊m(t) ⇒ feedback(t)
+outputs:
+  └ prop₊o(t) ⇒ o(t)
+istates:
+  └ diff₊Δ(t) ⇒ Δ(t)
+iparams:
+  └ prop₊K ⇒ K</code></pre><p>Right now, the created object is a container for the two included systems. However, it is possible to transform the object into a new <code>IOBlock</code> by calling the <code>connect_system</code> function. The resulting is equivalent to</p><pre><code class="nohighlight hljs">             +----------------------------------+
+  target(t)--| prop_c_block                     |--o(t)
+feedback(t)--| o(t)=K*(target(t) - feedback(t)) |
+             +----------------------------------+</code></pre><pre><code class="language-julia hljs">prop_c_block = connect_system(prop_c)</code></pre><p>Now we can hook our spaceship to this controller. It does not matter whether we use the connected <code>IOBlock</code> version <code>prop_c</code> or the <code>IOSystem</code> version <code>prop_c_block</code>. We want to build the connected system</p><pre><code class="nohighlight hljs">           +--------------------------------------------+
+           |  control system                            |
+           |       +--------+   +------------+          |
+target(t)--|-------| prop_c |---| spacecraft |-x(t)--+--|--altitude(t)
+           |  +-fb-|        |   | m, v(t)    |       |  |
+           |  |    +--------+   +------------+       |  |
+           |  +--------------------------------------+  |
+           +--------------------------------------------+</code></pre><pre><code class="language-julia hljs">@variables altitude(t)
+space_controller = IOSystem([prop_c.o =&gt; spacecraft.F, spacecraft.x =&gt; prop_c.feedback],
+                            [prop_c, spacecraft],
+                            namespace_map = [spacecraft.x =&gt; altitude],
+                            outputs = [altitude])
+# we want to reduce the space_controller to a block
+space_controller = connect_system(space_controller)
+@info &quot;Variables of space_controller&quot; space_controller equations(space_controller.system)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Variables of space_controller
+│   space_controller =
+│    IOBlock :##IOSystem#272 with 2 eqs
+│      ├ inputs:  target(t)
+│      ├ outputs: altitude(t)
+│      ├ istates: v(t)
+│      └ iparams: K, M
+│   equations(space_controller.system) =
+│    2-element Vector{Equation}:
+│     Differential(t)(v(t)) ~ K*(M^-1)*(target(t) - altitude(t))
+└     Differential(t)(altitude(t)) ~ v(t)</code></pre><h2 id="Simulate-System"><a class="docs-heading-anchor" href="#Simulate-System">Simulate System</a><a id="Simulate-System-1"></a><a class="docs-heading-anchor-permalink" href="#Simulate-System" title="Permalink"></a></h2><p>In order to simulate the system we can have to build the Julia functions.</p><pre><code class="language- hljs">gen = generate_io_function(space_controller)
+nothing # hide</code></pre><p>By doing so we get access to a named tuple with the fileds</p><ul><li><code>gen.f_ip</code> in-place function</li><li><code>gen.f_oop</code> out-of-place function</li><li><code>gen.massm</code> mass matrix of the system</li><li><code>gen.states</code> symbols of states (in order)</li><li><code>gen.inputs</code> symbols of inputs (in order)</li><li><code>gen.params</code> symbols of parameters (in order)</li><li>(see docstring for full list)</li></ul><p>The functions have the form <code>f_ip(du, u, inputs, params, t)</code> where <code>u</code> are all the states (outputs stacked on top of internal states) and <code>t</code> is the independent variable of the system. The order of the inputs and states can be controlled.</p><pre><code class="language- hljs">gen = generate_io_function(space_controller, f_states=[altitude, v], f_params=[K, M])
+@info &quot;Generated function&quot; gen.massm gen.states gen.inputs gen.params
+nothing # hide</code></pre><p>Well, let&#39;s see how our model is doing.</p><pre><code class="language- hljs">using Plots
+using OrdinaryDiffEq
+targetfun(t) = t&gt;1.0 ? 1.0 : 0
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [0.5, 1.0] # K, m
+u0 = [0.0, 0.0] # altitude, v
+tspan = (0.0, 30.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob, Tsit5())
+plot(t-&gt;sol(t)[1],tspan..., label=&quot;altitude&quot;, title=&quot;proportional control&quot;)
+plot!(t-&gt;targetfun(t),tspan..., label=&quot;target&quot;)</code></pre><p>Well who could have thought, proportional control looks like an harmonic oscillator 🤷‍♂️</p><h2 id="Defining-a-better-controller"><a class="docs-heading-anchor" href="#Defining-a-better-controller">Defining a better controller</a><a id="Defining-a-better-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Defining-a-better-controller" title="Permalink"></a></h2><p>We might just add a damping term (a force proportional to the velocity of the spaceship). If it works for a harmonic oscillator, it should work for our spaceship.</p><pre><code class="nohighlight hljs">           +--------------------------------------------------------+
+           |  control system                                        |
+           |  +--------------------------------------------------+  |
+           |  |    +--------+     +---+                          |  |
+           |  +-v--| prop_v |-(-)-| d |     +------------+       |  |
+           |       +--------+     | i |--F--| spacecraft |-v(t)--+  |
+           |       +--------+     | f |     | m          |-x(t)--+--|--altitude(t)
+target(t)--|-------| prop_c |-(+)-| f |     +------------+       |  |
+           |  +-fb-|        |     +---+                          |  |
+           |  |    +--------+                                    |  |
+           |  +--------------------------------------------------+  |
+           +--------------------------------------------------------+</code></pre><p>In order to do so we have to slightly redefine the spaceship system: now the velocity <code>v(t)</code> is also an output and not and internal state.</p><pre><code class="language-julia hljs">spacecraft = IOBlock([D(v) ~ F/M, D(x) ~ v],
+                     [F],
+                     [x,v],
+                     name = :spacecraft)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">IOBlock :spacecraft with 2 eqs
+  ├ inputs:  F(t)
+  ├ outputs: x(t), v(t)
+  ├ istates: (empty)
+  └ iparams: M</code></pre><p>One can define new blocks based on previously defined blocks.</p><pre><code class="language- hljs">prop_v = IOBlock(prop, name=:prop_v)
+fdiff = IOBlock(diff, name=:fdiff)
+
+space_controller = IOSystem([spacecraft.v =&gt; prop_v.i,
+                             spacecraft.x =&gt; prop_c.feedback,
+                             prop_c.o =&gt; fdiff.p,
+                             prop_v.o =&gt; fdiff.m,
+                             fdiff.Δ =&gt; spacecraft.F],
+                            [prop_v, prop_c, fdiff, spacecraft],
+                            namespace_map = [spacecraft.x =&gt; altitude],
+                            outputs = [altitude])
+
+space_controller = connect_system(space_controller)
+gen = generate_io_function(space_controller, f_states=[altitude, v], f_params=[prop_c.K, M, prop_v.K])
+
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [1.0, 1.0, 0.5] # propc, M, propv
+u0 = [0.0, 0.0] # altitude, v
+tspan = (0.0, 30.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob, Tsit5())
+plot(sol, vars=(0,1), label=&quot;altitude&quot;, title=&quot;better control&quot;)
+plot!(t-&gt;targetfun(t),tspan..., label=&quot;target&quot;)</code></pre><h2 id="Defining-an-PT1-controller"><a class="docs-heading-anchor" href="#Defining-an-PT1-controller">Defining an PT1 controller</a><a id="Defining-an-PT1-controller-1"></a><a class="docs-heading-anchor-permalink" href="#Defining-an-PT1-controller" title="Permalink"></a></h2><pre><code class="nohighlight hljs">             +-----------------------------------------------+
+             | pi_c                                   +---+  |
+             |                           +------------|   |  |
+             |        +----+  +--------+ | +-------+  |sum|--|--o(t)
+  target(t)--|--p(t)--|diff|--| prop K |-+-| int T |--|   |  |
+feedback(t)--|--m(t)--|    |  +--------+   +-------+  +---+  |
+             |        +----+                                 |
+             +-----------------------------------------------+</code></pre><pre><code class="language-julia hljs">@parameters T a1(t) a2(t)
+@variables Σ(t) altitude(t)
+int = IOBlock([D(o) ~ 1/T * i - o], [i], [o], name=:int)
+adder = IOBlock([Σ ~ a1 + a2], [a1, a2], [Σ], name=:add)
+
+pi_c = IOSystem([diff.Δ =&gt; prop.i,
+                 prop.o =&gt; int.i,
+                 prop.o =&gt; adder.a1,
+                 int.o =&gt; adder.a2],
+                [diff, prop, int, adder],
+                namespace_map = [diff.p =&gt; :target,
+                                 diff.m =&gt; :feedback,
+                                 adder.Σ =&gt; o],
+                outputs = [o],
+                name=:pi_c)</code></pre><p>as before we can close the loop and build the control circuit</p><pre><code class="language-julia hljs">space_controller = IOSystem([pi_c.o =&gt; spacecraft.F , spacecraft.x =&gt; pi_c.feedback],
+                            [pi_c, spacecraft],
+                            namespace_map = [spacecraft.x =&gt; altitude],
+                            outputs = [altitude])
+space_controller = connect_system(space_controller, verbose=false)
+@info &quot;Variables of space_controller&quot; space_controller equations(space_controller.system)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Variables of space_controller
+│   space_controller =
+│    IOBlock :##IOSystem#280 with 3 eqs
+│      ├ inputs:  target(t)
+│      ├ outputs: altitude(t)
+│      ├ istates: int₊o(t), v(t)
+│      └ iparams: K, T, M
+│   equations(space_controller.system) =
+│    3-element Vector{Equation}:
+│     Differential(t)(int₊o(t)) ~ K*(T^-1)*(target(t) - altitude(t)) - int₊o(t)
+│     Differential(t)(v(t)) ~ (M^-1)*(K*(target(t) - altitude(t)) + int₊o(t))
+└     Differential(t)(altitude(t)) ~ v(t)</code></pre><p>and we can simulate and plot the system</p><pre><code class="language- hljs">gen = generate_io_function(space_controller, f_states=[altitude], f_params=[K, T, M])
+
+odefun(du, u, p, t) = gen.f_ip(du, u, [targetfun(t)], p, t)
+p = [0.5, -1.5, 1.0] # K, T, m
+u0 = [0.0, 0.0, 0.0] # altitude, int.o, v
+tspan = (0.0, 50.0)
+prob = ODEProblem(odefun, u0, tspan, p)
+sol = solve(prob, Tsit5())
+plot(sol, vars=(0,[ 1,2 ]), label=[&quot;altitude&quot; &quot;integrator&quot;], title=&quot;PT1 controller&quot;)
+plot!(t-&gt;targetfun(t),tspan..., label=&quot;target&quot;)</code></pre><p>thank you for flying with us :)</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../kuramoto_network/">Kuramoto Network »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.8 on <span class="colophon-date" title="Friday 15 October 2021 11:21">Friday 15 October 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
