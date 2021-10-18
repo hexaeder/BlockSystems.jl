@@ -70,6 +70,24 @@ struct IOBlock <: AbstractIOSystem
         # XXX: see above
         # @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
+        # lhs of the equation should be either differential of state/output
+        for eq in equations(odes)
+            lhs = eq.lhs
+            if istree(lhs)
+                if (operation(lhs) isa Differential) && arguments(lhs)[1] ∈ Set(istates ∪ outputs)
+                    # this is fine
+                elseif lhs ∈ Set(istates ∪ outputs)
+                    # this is fine
+                else
+                    throw(ArgumentError("$eq : unexpected lhs of equation! LHS shoud be either x or ∂x/∂t where x ∈ istates ∪ outputs!"))
+                end
+            else
+                if !isequal(lhs, 0)
+                    throw(ArgumentError("$eq : unexpected lhs of equation! Please write constrains in the form 0 ~ f(⋅)"))
+                end
+            end
+        end
+
         additional_vars = get_variables([eq.rhs for eq in rem_eqs])
         all_vars = vcat(inputs, outputs, istates, iparams, get_iv(odes))
         @check uniquenames(all_vars) "There seem to be a name clashes between inputs, iparams istates and outputs!"
@@ -93,6 +111,7 @@ struct IOBlock <: AbstractIOSystem
 end
 
 ModelingToolkit.get_iv(block::IOBlock) = get_iv(block.system)
+ModelingToolkit.equations(block::IOBlock) = equations(block.system)
 
 function namespace_rem_eqs(iob::IOBlock)
     eqs = iob.removed_eqs
@@ -358,7 +377,7 @@ end
 """
 Helper function for `Base.show` for IOBlock and IOSystem
 """
-function print_variables(io::IO, V::Vector{Symbolic})
+function print_variables(io::IO, V)
     printmax = get(io, :compact, false) ? 3 : 7
     l = length(V)
     if l == 0
@@ -384,6 +403,10 @@ function Base.show(io::IO, iob::IOBlock)
         print(io, "\n  ├ outputs: "); print_variables(io, iob.outputs)
         print(io, "\n  ├ istates: "); print_variables(io, iob.istates)
         print(io, "\n  └ iparams: "); print_variables(io, iob.iparams)
+        diffs = rhs_differentials(iob)
+        if !isempty(diffs)
+            print(io, "\n  RHS differentials: "); print_variables(io, diffs)
+        end
     else
         Base.printstyled(io, "$(iob.name): ", bold=true)
         print_variables(ioc, iob.inputs)

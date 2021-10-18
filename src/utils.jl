@@ -91,3 +91,31 @@ function recursive_substitute(term, rules::Dict)
     end
     return new_term
 end
+
+"""
+    rhs_differentials(iob::IOBlock)
+
+Return Set of all differentials which are present in the rhs of the system.
+"""
+function rhs_differentials(iob)
+    diffs = Set{SymbolicUtils.Symbolic}()
+    for eq in equations(iob)
+        _collect_differentials!(diffs, eq.rhs)
+    end
+    return diffs
+end
+
+_collect_differentials(ex) = _collect_differentials!(Set{SymbolicUtils.Symbolic}(), ex)
+
+function _collect_differentials!(found, ex)
+    if SymbolicUtils.istree(ex)
+        if operation(ex) isa Differential
+            push!(found, ex)
+        else
+            for arg in arguments(ex)
+                _collect_differentials!(found, arg)
+            end
+        end
+    end
+    return found
+end

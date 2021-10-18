@@ -52,6 +52,7 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     @check Set(f_inputs) ⊆ Set(ios.inputs) "f_inputs !⊆ inputs"
     @check Set(f_params) ⊆ Set(ios.iparams) "f_params !⊆ iparams"
     @check Set(f_rem_states) ⊆ Set(ios.removed_states) "f_rem_states !⊆ removed_states"
+    @check isempty(rhs_differentials(ios)) "RHS should not contain any differentials at this point."
 
     # enforce ordering of states, inputs and params
     states = vcat(f_states, ios.outputs, ios.istates) |> unique
