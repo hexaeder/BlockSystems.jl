@@ -293,16 +293,43 @@ end
 
         @test equations(sysAC.system) == [D(o) ~ 2 + b, D(y) ~ 1 + b]
 
-
         # fouth block with more complex stuff
         @variables x(t) y(t)
         B = IOBlock([D(x) ~ a, y ~ x + 3], [], [y])
 
         sysAB = IOSystem([B.y => A.i], [A, B]) |> connect_system
+        @test length(BlockSystems.rhs_differentials(sysAB)) == 0
+    end
 
-        equations(sysAB)
-        # XXX: what happens here?
-        # well we need to explicitly substitute algebraic states inside differentials even
-        # if they are outputs!
+    @testset "subs of differential states" begin
+        @parameters t a(t) b
+        @variables x(t) y(t) z(t)
+        D = Differential(t)
+
+        blk = IOBlock([D(x) ~ 1 + D(y),
+                       D(y) ~ a + b], [], [])
+        blk2 = substitute_derivatives(blk, verbose=true)
+        @test equations(blk2) == [D(x) ~ 1 + a + b,
+                                  D(y) ~ a + b]
+
+        blk = IOBlock([D(x) ~ 1 + D(y),
+                       y ~ 2 + b], [], [])
+        blk2 = substitute_derivatives(blk, verbose=true)
+        @test equations(blk2) == [D(x) ~ 1 ,
+                                  y ~ 2 + b]
+
+        blk = IOBlock([D(x) ~ 1 + D(y),
+                       y ~ 2 + a], [], [])
+        blk2 = substitute_derivatives(blk, verbose=true)
+        @test equations(blk2) == [D(x) ~ 1 + D(a),
+                                  y ~ 2 + a]
+
+        blk = IOBlock([D(x) ~ 1 + D(y),
+                       y ~ 2 + z,
+                       D(z) ~ 5*x + b], [], [])
+        blk2 = substitute_derivatives(blk, verbose=true)
+        @test equations(blk2) == [D(x) ~ 1 + 5*x + b,
+                                  y ~ 2 + z,
+                                  D(z) ~ 5*x + b]
     end
 end

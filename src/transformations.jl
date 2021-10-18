@@ -129,30 +129,8 @@ Won't reduce algebraic states which are labeld as `output`.
 function substitute_algebraic_states(iob::IOBlock; verbose=false)
     reduced_eqs = deepcopy(equations(iob))
 
-    # only consider states for reduction which are explicit algebraic and not in outputs
-    condition = eq -> begin
-        (type, var) = eq_type(eq)
-        type == :explicit_algebraic && var ∉ Set(iob.outputs)
-    end
-    algebraic_idx = findall(condition, reduced_eqs)
+    (rules, removable) = _algebraic_substitution_rules(reduced_eqs; skip=Set(iob.outputs))
 
-    # symbols of all algebraic eqs
-    symbols = [eq.lhs for eq ∈ reduced_eqs[algebraic_idx]]
-
-    # generate dependency graph
-    g = SimpleDiGraph(length(algebraic_idx))
-    for (i, eq) in enumerate(reduced_eqs[algebraic_idx])
-        rhs_vars = get_variables(eq.rhs)
-        for (isym, sym) in enumerate(symbols)
-            if Set([sym]) ⊆ Set(rhs_vars)
-                add_edge!(g, isym => i)
-            end
-        end
-    end
-    removable = algebraic_idx[_pairwise_cycle_free(g)]
-    @assert allunique(removable)
-
-    rules = Dict(eq.lhs => eq.rhs for eq in reduced_eqs[removable])
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
         reduced_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
@@ -171,7 +149,44 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false)
     # remove removable equations from reduced_eqs
     deleteat!(reduced_eqs, sort(removable))
 
-    IOBlock(iob.name, reduced_eqs, iob.inputs, iob.outputs, vcat(removed_eqs, iob.removed_eqs); iv=get_iv(iob))
+    IOBlock(iob.name, reduced_eqs, iob.inputs, iob.outputs, removed_eqs; iv=get_iv(iob))
+end
+
+"""
+    _algebraic_substitution_rules(eqs; skip=nothing)
+
+Extract substition rules for explicit algebraic equations in given equations.
+Makes sure that those substitutiosn are pairwise cycle free.
+
+Returns Tuple of substitution dict and corresponding indices of algebraic equations
+in the given equations.
+"""
+function _algebraic_substitution_rules(eqs; skip=nothing)
+    # only consider states for reduction which are explicit algebraic and not in outputs
+    condition = eq -> begin
+        (type, var) = eq_type(eq)
+        type == :explicit_algebraic && (skip===nothing || var ∉ skip)
+    end
+    algebraic_idx = findall(condition, eqs)
+
+    # symbols of all algebraic eqs
+    symbols = [eq.lhs for eq ∈ eqs[algebraic_idx]]
+
+    # generate dependency graph
+    g = SimpleDiGraph(length(algebraic_idx))
+    for (i, eq) in enumerate(eqs[algebraic_idx])
+        rhs_vars = get_variables(eq.rhs)
+        for (isym, sym) in enumerate(symbols)
+            if Set([sym]) ⊆ Set(rhs_vars)
+                add_edge!(g, isym => i)
+            end
+        end
+    end
+    removable = algebraic_idx[_pairwise_cycle_free(g)]
+    @assert allunique(removable)
+
+    rules = Dict(eq.lhs => eq.rhs for eq in eqs[removable])
+    return (rules, removable)
 end
 
 """
@@ -210,34 +225,70 @@ end
     substitute_derivatives(iob::IOBlock; verbose=false)
 
 Expand all derivatives in the RHS of the system. Try to substitute
-in the lhs with
+in the lhs with their definition.
+
+I.e.
+
+    D(o) ~ 1 + D(i)   =>  D(o) ~ 2 + a
+    D(i) ~ 1 + a          D(i) ~ 1 + a
+
+Process happens in multiple steps:
+- try to find explicit equation for differential
+- if none found try to recursivly substitute inside differential with known algebraic states
+- expand derivatives and try again to substitute with known differentials
+
 """
 function substitute_derivatives(iob::IOBlock; verbose=false)
+    diffs = rhs_differentials(iob)
+
+    # if there are none just return the old block
+    if isempty(diffs)
+        verbose && @info "No rhs derivatives in block!"
+        return iob
+    end
+    verbose && @info "Substitute rhs derivatives..."
+
+    eqs = deepcopy(equations(iob))
+
+    algebraic_subs = Dict{Symbolic, Symbolic}()
+    function lazy_alg_subs()
+        if isempty(algebraic_subs)
+            verbose && println("Lazily initilized algebraic substitutions for substituion of derivatives!")
+            merge!(algebraic_subs, _algebraic_substitution_rules(eqs)[1])
+        end
+        return algebraic_subs
+    end
+
+    rules = Dict()
+    known_differentials = Dict(eq.lhs => eq.rhs for eq in eqs if istree(eq.lhs) && operation(eq.lhs) isa Differential)
+    for diff in diffs
+        if haskey(known_differentials, diff)
+            rules[diff] = known_differentials[diff]
+            verbose && println("    ", diff, " => ", rules[diff])
+        else
+            substituted = recursive_substitute(diff, lazy_alg_subs())
+            expanded = expand_derivatives(substituted)
+            sub_known = substitute(expanded, known_differentials)
+
+            rules[diff] = sub_known
+            verbose && println("    ", diff, " => ", rules[diff])
+            if !isempty(_collect_differentials(sub_known))
+                println("        └ could not resolve this one!")
+            end
+        end
+    end
+
     eqs = deepcopy(equations(iob))
     rem_eqs = deepcopy(iob.removed_eqs)
 
     for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ expand_derivatives(eq.rhs)
+        eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
     for (i, eq) in enumerate(rem_eqs)
-        rem_eqs[i] = eq.lhs ~ expand_derivatives(eq.rhs)
-    end
-
-    substitutions = [eq.lhs => eq.rhs for eq in eqs if istree(eq.lhs) && operation(eq.lhs) isa Differential]
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
-    end
-    for (i, eq) in enumerate(rem_eqs)
-        rem_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+        rem_eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
 
     newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob))
-    if verbose
-        old = rhs_differentials(iob)
-        new = rhs_differentials(iob)
-        removed = setdiff(old, new)
-        @info "Substituted derivatives:" removed
-    end
 
     return newblock
 end
