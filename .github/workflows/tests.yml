@@ -28,6 +28,10 @@ jobs:
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
+          testA: 100
+          testB: "100"
+          testC: 100 #commnt
+          testD: "100" #comment
         with:
           path: ~/.julia/artifacts
           key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
