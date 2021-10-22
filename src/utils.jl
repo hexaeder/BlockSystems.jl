@@ -13,7 +13,7 @@ macro check(cond::Expr, msg)
         args  = (args..., :("\n   " * $symbol * $lhs * " = " * repr($(esc(a)))))
     end
     return :($(esc(cond)) ||
-             throw(ArgumentError($msg * "\n  " * $head * $(args...))))
+             throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...))))
 end
 
 """
