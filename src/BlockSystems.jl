@@ -294,12 +294,16 @@ export BlockSpec, fulfills
 
 """
     struct BlockSpec
+    BlockSpec(in::Vector, out::Vector; in_strict=true, out_strict=false)
 
 Block specification, defines which inputs/outputs an [`AbstractIOSystem`](@ref)
 should have. Contains two vectors of `Symbols`. Can be initialized with Vectors
 of `Symbols`, `Num` or `<:Symbolic`.
 
-Object is functor: call `(::BlockSpec)(ios)` to check wether `ios` fulfills
+If `strict=true` the in/outputs *must equal* the specification. If `strict=false`
+the block *must contain* the in/outputs from the specification.
+
+Object is functor: call `(::BlockSpec)(ios)` to check whether `ios` fulfills
 specification. See also [`fulfills`](@ref).
 
 ```
@@ -312,9 +316,13 @@ spec(iob)
 struct BlockSpec
     inputs::Vector{Symbol}
     outputs::Vector{Symbol}
+    in_strict::Bool
+    out_strict::Bool
 end
-BlockSpec(in::Vector{Num}, out::Vector{Num}) = BlockSpec(value.(in), value.(out))
-BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}) = BlockSpec(getname.(in), getname.(out))
+
+BlockSpec(in::Vector, out::Vector; in_strict=true, out_strict=false) = BlockSpec(in, out, in_strict, out_strict)
+BlockSpec(in::Vector{Num}, out::Vector{Num}; kwargs...) = BlockSpec(value.(in), value.(out); kwargs...)
+BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}; kwargs...) = BlockSpec(getname.(in), getname.(out); kwargs...)
 
 (bs::BlockSpec)(io) = fulfills(io, bs)
 
@@ -323,8 +331,17 @@ BlockSpec(in::Vector{<:Symbolic}, out::Vector{<:Symbolic}) = BlockSpec(getname.(
 
 Check whether `io` fulfills the given [`BlockSpec`](@ref).
 """
-fulfills(io, bs::BlockSpec) = Set(bs.inputs) ⊆ Set(getname.(io.inputs)) &&
-                                Set(bs.outputs) ⊆ Set(getname.(io.outputs))
+function fulfills(io, bs::BlockSpec)
+    if bs.in_strict
+        Set(bs.inputs) == Set(getname.(io.inputs))
+    else
+        Set(bs.inputs) ⊆ Set(getname.(io.inputs))
+    end && if bs.out_strict
+        Set(bs.outputs) == Set(getname.(io.outputs))
+    else
+        Set(bs.outputs) ⊆ Set(getname.(io.outputs))
+    end
+end
 
 
 """
