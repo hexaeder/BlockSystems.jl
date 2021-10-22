@@ -1,4 +1,4 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs
 
 """
 $(SIGNATURES)

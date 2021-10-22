@@ -47,6 +47,15 @@ Each `IOSystem` can be transformed into an `IOBlock`. At this step the actual ma
 ```@docs
 connect_system
 ```
+There are also other transformations available
+```@docs
+rename_vars
+remove_superfluous_states
+substitute_algebraic_states
+substitute_derivatives
+simplify_eqs
+set_p
+```
 
 ## Function building
 ```@docs
