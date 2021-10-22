@@ -1,4 +1,4 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p
 
 """
 $(SIGNATURES)
@@ -272,7 +272,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false)
 
             rules[diff] = sub_known
             verbose && println("    ", diff, " => ", rules[diff])
-            if !isempty(_collect_differentials(sub_known))
+            if verbose && !isempty(_collect_differentials(sub_known))
                 println("        └ could not resolve this one!")
             end
         end
@@ -328,6 +328,7 @@ function rename_vars(blk::IOBlock; kwargs...)
     end
     rename_vars(blk, substitutions)
 end
+
 function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
     eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
@@ -335,3 +336,37 @@ function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
     outputs = map(x->substitute(x, subs), blk.outputs)
     IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk))
 end
+
+
+"""
+    set_p(blk::IOBlock, p::Dict)
+    set_p(blk::IOBlock, p::Pair)
+
+Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters.
+
+Keys of dict can be either `Symbols` or the `Sybolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
+"""
+function set_p(blk::IOBlock, p::Dict)
+    subs = Dict{Symbolic, Float64}()
+    validp = Set(blk.iparams)
+    for k in keys(p)
+        if k isa Symbol
+            sym = getproperty(blk, k)
+        elseif k isa Num
+            sym = value(k)
+        elseif k isa Symbolic
+            sym = k
+        else
+            error("Can't use $k, wrong type $(typeof(k))")
+        end
+        sym = remove_namespace(blk.name, sym)
+        @check sym ∈ validp "Symbol $sym is not iparam of block"
+        @check p[k] isa Number "p value has to be a number! Maybe you are looking for `rename_vars` instead?"
+        subs[sym] = p[k]
+    end
+    eqs     = map(eq->eqsubstitute(eq, subs), equations(blk))
+    rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
+    IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk))
+end
+
+set_p(blk::IOBlock, p::Pair) = set_p(blk, Dict(p))
