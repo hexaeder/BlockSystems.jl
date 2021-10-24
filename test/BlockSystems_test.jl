@@ -298,6 +298,21 @@ using LightGraphs
                                             name=:sys)
     end
 
+    @testset "algebraic connections" begin
+        @parameters t p1 p2 i(t)
+        @variables o1(t) o2(t) o3(t)
+        dt = Differential(t)
+
+        @named b1 = IOBlock([o1 ~ p1], [], [o1])
+        @named b2 = IOBlock([o2 ~ p2], [], [o2])
+        @named b3 = IOBlock([dt(o3) ~ i], [i], [o3])
+
+        sys = IOSystem([b1.o1 + b2.o2 => b3.i],
+                       [b1, b2, b3], outputs=[b3.o3])
+        con = connect_system(sys, verbose=false)
+        @test equations(con) == [dt(o3) ~ p1 + p2]
+    end
+
     @testset "test BlockSpec" begin
         # test the constructors
         @parameters t

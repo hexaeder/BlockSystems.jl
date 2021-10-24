@@ -5,7 +5,7 @@ using DocStringExtensions
 using ModelingToolkit
 using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
-using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value
+using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
 using ModelingToolkit.Symbolics: tosymbol
@@ -198,7 +198,11 @@ $(SIGNATURES)
 
 Construct a new IOSystem from various subsystems.
 Arguments:
- - `cons`: the connections in the form `sub1.output => sub2.input`
+ - `cons`:
+
+    The connections in the form `sub1.output => sub2.input`. It is also possible to use simple
+    algebraic equations such as `sub1.o1 + sub2.o2 => sub3.input`.
+
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
    i.e. sub1.input => voltage`. Variables without entry in the map will be
@@ -232,7 +236,7 @@ function IOSystem(cons,
     nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
 
     # check validity of provided connections
-    @check Set(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection needs to be output of subsystem."
+    @check vars(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection may only contain outputs of subsystem."
     @check Set(last.(cons)) ⊆ Set(nspcd_inputs) "Second argument in connection needs to be input of subsystem."
     @check allunique(last.(cons)) "Multiple connections to same input!"
 
