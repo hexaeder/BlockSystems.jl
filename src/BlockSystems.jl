@@ -61,14 +61,15 @@ struct IOBlock <: AbstractIOSystem
 
     function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs)
         @check name == odes.name "Name of inner ODESystem does not match name of IOBlock"
+        # XXX: temp. disable check: outputs may be completely implicit at block level
         @check Set(inputs) ⊆ Set(parameters(odes)) "inputs must be parameters"
         # XXX: temp. disable check: outputs may be completely implicit at block level
-        # @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
+        @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
         @check Set(iparams) ⊆ Set(parameters(odes)) "iparams must be parameters"
         @check Set(istates) ⊆ Set(states(odes)) "istates must be variables"
         @check Set(inputs ∪ iparams) == Set(parameters(odes)) "inputs ∪ iparams != params"
         # XXX: see above
-        # @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
+        @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
 
         # lhs of the equation should be either differential of state/output
         for eq in equations(odes)

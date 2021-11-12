@@ -12,8 +12,12 @@ macro check(cond::Expr, msg)
         symbol = (i == length(cond.args)-1) ? "└ " : "├ "
         args  = (args..., :("\n   " * $symbol * $lhs * " = " * repr($(esc(a)))))
     end
-    return :($(esc(cond)) ||
-             throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...))))
+    # return :($(esc(cond)) ||
+    #          throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...))))
+    return :(if !$(esc(cond))
+                 # throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...)))
+                 @warn $(esc(msg)) * "\n  " * $head * $(args...)
+             end)
 end
 
 """

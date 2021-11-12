@@ -250,7 +250,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false)
 
     eqs = deepcopy(equations(iob))
 
-    algebraic_subs = Dict{Symbolic, Symbolic}()
+    algebraic_subs = Dict{Symbolic, Any}()
     function lazy_alg_subs()
         if isempty(algebraic_subs)
             verbose && println("Lazily initilized algebraic substitutions for substituion of derivatives!")
@@ -369,4 +369,4 @@ function set_p(blk::IOBlock, p::Dict)
     IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk))
 end
 
-set_p(blk::IOBlock, p::Pair) = set_p(blk, Dict(p))
+set_p(blk::IOBlock, p...) = length(p) > 1 ? set_p(blk, Dict(p)) : set_p(blk, Dict(only(p)))
