@@ -23,7 +23,8 @@ function connect_system(ios::IOSystem;
                         simplify_eqs=true,
                         remove_superflous_states=false,
                         substitute_algebraic_states=true,
-                        substitute_derivatives=true)
+                        substitute_derivatives=true,
+                        warn=true)
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -51,22 +52,22 @@ function connect_system(ios::IOSystem;
     eqs = map(eq->eqsubstitute(eq, promotion_rules), eqs)
     removed_eqs  = map(eq->eqsubstitute(eq, promotion_rules), removed_eqs)
 
-    block = IOBlock(ios.name, eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios))
+    block = IOBlock(ios.name, eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios), warn)
 
     if remove_superflous_states
-        block = BlockSystems.remove_superflous_states(block; verbose)
+        block = BlockSystems.remove_superflous_states(block; verbose, warn)
     end
 
     if substitute_algebraic_states
-        block = BlockSystems.substitute_algebraic_states(block; verbose)
+        block = BlockSystems.substitute_algebraic_states(block; verbose, warn)
     end
 
     if substitute_derivatives
-        block = BlockSystems.substitute_derivatives(block; verbose)
+        block = BlockSystems.substitute_derivatives(block; verbose, warn)
     end
 
     if simplify_eqs
-        block = BlockSystems.simplify_eqs(block)
+        block = BlockSystems.simplify_eqs(block; warn)
     end
 
     return block
@@ -74,7 +75,7 @@ end
 
 
 """
-    remove_superfluous_states(iob::IOBlock; verbose=false)
+    remove_superfluous_states(iob::IOBlock; verbose=false, warn=true)
 
 This function removes equations from block, which are not used in order to
 generate the outputs. It looks for equations which have no path to the outputs
@@ -84,7 +85,7 @@ The removed equations will be not avaiblable as removed quations of the new IOBl
 
 TODO: Maybe we should try to reduce the inputs to.
 """
-function remove_superfluous_states(iob::IOBlock; verbose=false)
+function remove_superfluous_states(iob::IOBlock; verbose=false, warn=true)
     iv = get_iv(iob)
     outputs = iob.outputs
 
@@ -114,19 +115,19 @@ function remove_superfluous_states(iob::IOBlock; verbose=false)
 
     verbose && @info "Removed superflous states with equations" removed_eqs
 
-    IOBlock(iob.name, neweqs, iob.inputs, iob.outputs, iob.removed_eqs; iv)
+    IOBlock(iob.name, neweqs, iob.inputs, iob.outputs, iob.removed_eqs; iv, warn)
 end
 
 
 """
-    substitute_algebraic_states(iob::IOBlock; verbose=false)
+    substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
 
 Reduces the number of equations by substituting explicit algebraic equations.
 Returns a new IOBlock with the reduced equations. The removed eqs are stored
 together with the previous `removed_eqs` in the new IOBlock.
 Won't reduce algebraic states which are labeld as `output`.
 """
-function substitute_algebraic_states(iob::IOBlock; verbose=false)
+function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
     reduced_eqs = deepcopy(equations(iob))
 
     (rules, removable) = _algebraic_substitution_rules(reduced_eqs; skip=Set(iob.outputs))
@@ -149,7 +150,7 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false)
     # remove removable equations from reduced_eqs
     deleteat!(reduced_eqs, sort(removable))
 
-    IOBlock(iob.name, reduced_eqs, iob.inputs, iob.outputs, removed_eqs; iv=get_iv(iob))
+    IOBlock(iob.name, reduced_eqs, iob.inputs, iob.outputs, removed_eqs; iv=get_iv(iob), warn)
 end
 
 """
@@ -222,7 +223,7 @@ end
 
 
 """
-    substitute_derivatives(iob::IOBlock; verbose=false)
+    substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
 
 Expand all derivatives in the RHS of the system. Try to substitute
 in the lhs with their definition.
@@ -238,7 +239,7 @@ Process happens in multiple steps:
 - expand derivatives and try again to substitute with known differentials
 
 """
-function substitute_derivatives(iob::IOBlock; verbose=false)
+function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     diffs = rhs_differentials(iob)
 
     # if there are none just return the old block
@@ -288,28 +289,28 @@ function substitute_derivatives(iob::IOBlock; verbose=false)
         rem_eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
     end
 
-    newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob))
+    newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob), warn)
 
     return newblock
 end
 
 
 """
-    simplify_eqs(iob::IOBlock)
+    simplify_eqs(iob::IOBlock; verbose=false, warn=true)
 
 Simplify eqs and removed eqs and return new IOBlock.
 """
-function simplify_eqs(iob::IOBlock; verbose=false)
+function simplify_eqs(iob::IOBlock; verbose=false, warn=true)
     verbose && @info "Simplify iob equations..."
     simplified_eqs = simplify.(equations(iob))
     simplified_rem_eqs = simplify.(iob.removed_eqs)
-    IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob))
+    IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
 
 """
-    rename_vars(blk::IOBLock, kwargs...)
-    rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
+    rename_vars(blk::IOBLock; warn=true, kwargs...)
+    rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
 
 Returns new IOBlock which is similar to blk but with new variable names.
 Variable renamings should be provided as keyword arguments, i.e.
@@ -319,22 +320,22 @@ Variable renamings should be provided as keyword arguments, i.e.
 to rename `x(t)=>newx(t)` and `k=>knew`. Subsitutions can be also provided as
 dict of `Symbolic` types (`Sym`s and `Term`s).
 """
-function rename_vars(blk::IOBlock; kwargs...)
+function rename_vars(blk::IOBlock; warn=true, kwargs...)
     substitutions = Dict{Symbolic, Symbolic}()
     for pair in kwargs
         key = remove_namespace(blk.name, getproperty(blk, pair.first))
         val = rename(key, pair.second)
         substitutions[key] = val
     end
-    rename_vars(blk, substitutions)
+    rename_vars(blk, substitutions; warn)
 end
 
-function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic})
+function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
     eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
     inputs  = map(x->substitute(x, subs), blk.inputs)
     outputs = map(x->substitute(x, subs), blk.outputs)
-    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk))
+    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk), warn)
 end
 
 

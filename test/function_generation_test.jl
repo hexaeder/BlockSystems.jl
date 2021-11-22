@@ -4,7 +4,6 @@ using ModelingToolkit
 using ModelingToolkit: get_iv, get_eqs, get_states
 using LinearAlgebra
 using ModelingToolkit.Symbolics
-Symbolics
 
 @info "Testes of function_generation.jl"
 

@@ -19,40 +19,22 @@ using ModelingToolkit.SymbolicUtils: operation
 
         a = Set([1,2,3])
         b = Set([2,3,4])
-        @check :warn a ⊆ b "test"
+        @test_logs (:warn, ) @checkwarn a ⊆ b "test"
 
         a = Set([1,2,3])
         b = Set([2,3,4])
-        @check :warn b ⊆ a "test"
+        @test_logs (:warn, ) @checkwarn b ⊆ a "test"
 
         a = Set([1,2,3])
         b = Set([1,2,3])
-        @check :warn !(a ⊆ b) "test"
+        @test_logs (:warn, ) @checkwarn !(a ⊆ b) "test"
 
-        @check :warn length(a) == 2 "blo"
+        warn = true
+        @test_logs (:warn, ) @checkwarn warn length(a) == 2 "blo"
+        warn = false
+        @checkwarn warn length(a) == 2 "blo"
 
-        @test_throws ArgumentError @check :error length(a) == 2 "blo"
-
-        a = [1,2,3]
-        b = [1,2,3]
-        level = :error
-        @test_throws ArgumentError @check level Set(a)==b "bla"
-        level = :warn
-        @check level Set(a)==b "bla"
-        level = :silent
-        @check level Set(a)==b "bla"
-
-        @check Set(a)==b "bla"
-        @test_throws ArgumentError @check :error Set(a)==b "bla"
-        @check :warn Set(a)==b "bla"
-        @check :silent Set(a)==b "bla"
-
-        level = :error
-        @checkwarn level Set(a)==b "bla"
-        level = :warn
-        @checkwarn level Set(a)==b "bla"
-        level = :silent
-        @checkwarn level Set(a)==b "bla"
+        @test_throws ArgumentError @check length(a) == 2 "blo"
     end
 
     @testset "remove namespace of symbols" begin

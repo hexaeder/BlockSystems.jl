@@ -35,24 +35,30 @@ using Graphs
         @test Set(iob.outputs) == Set([o1, o2])
         @test Set(iob.removed_states) == Set()
 
-        @test_throws ArgumentError IOBlock(eqs, [x1], [o1,o2])
-        @test_throws ArgumentError IOBlock(eqs, [i1,i2], [i1,o1,o2])
+        # x1 is a state not an input. Assign it as input will elad to warn + name conflict between inputs and states
+        @test_throws ArgumentError IOBlock(eqs, [x1], [o1,o2], warn=false)
+
+        @test_throws ArgumentError IOBlock(eqs, [i1,i2], [i1,o1,o2], warn=false)
 
         @parameters i a(t)
         @variables x(t) o(t)
         sys = ODESystem( [D(x) ~ a * i], name=:foo)
         aeq = [i ~ 2*a + i1]
-        @test_throws ArgumentError IOBlock(:name, [i.val], [a.val], [], [x.val], sys, aeq)
+        # name conflict betwen ios and odes
+        @test_throws ArgumentError IOBlock(:name, [i.val], [a.val], [], [x.val], sys, aeq; warn=true)
 
         @parameters t a(t) p
         @variables x(t) y(t)
         D = Differential(t)
         IOBlock([x ~ 2 + a], [], [x])
-        @test_throws ArgumentError IOBlock([D(y) ~ 2 + a], [], [x])
+
+        # implecit output, warn
+        @test_logs (:warn, ) IOBlock([D(y) ~ 2 + a], [], [x])
 
         @test_throws ArgumentError IOBlock([a ~ 2 + x], [], [x])
         @test_throws ArgumentError IOBlock([p ~ 2 + x], [p], [x], iv=t)
         @test_throws ArgumentError IOBlock([a ~ 2 + x], [a], [x], iv=t)
+        @test_logs (:warn, ) IOBlock([a ~ 2 + x + 2*a], [a], [x], iv=t)
     end
 
     @testset "test of create_namespace_promotions" begin
