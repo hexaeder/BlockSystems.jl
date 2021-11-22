@@ -2,7 +2,7 @@ using Test
 using BlockSystems
 using ModelingToolkit
 using ModelingToolkit: get_iv, get_eqs, get_states
-using LightGraphs
+using Graphs
 
 # ordering and simplification should not matter for equity of equations!
 import Base.==

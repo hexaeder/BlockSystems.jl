@@ -193,7 +193,7 @@ end
     _pairwise_cycle_free(g:SimpleDiGraph)
 
 Returns an array of vertices, which pairwise do not belong to any cycle in `g`.
-Uses `simplecycles` from `LightGraphs`. The algorithm starts with all vertices
+Uses `simplecycles` from `Graphs`. The algorithm starts with all vertices
 and iteratively removes the vertices is part of most cycles.
 """
 function _pairwise_cycle_free(g::SimpleDiGraph)

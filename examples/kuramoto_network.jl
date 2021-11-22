@@ -4,7 +4,7 @@ In this example we model a Network based on the [Kuroamoto model](https://en.wik
 =#
 
 using NetworkDynamics
-using LightGraphs
+using Graphs
 using BlockSystems
 using ModelingToolkit
 using OrdinaryDiffEq
@@ -31,7 +31,7 @@ function generate_ode_vertex(iob::IOBlock, aggregator; kwargs...)
     gen = generate_io_function(iob; kwargs...)
     f = (du, u, edges, p, t) -> gen.f_ip(du, u, aggregator(edges), p, t)
     vars = ModelingToolkit.tosymbol.(gen.states)
-    ODEVertex(f! = f, dim = length(vars), sym = vars)
+    ODEVertex(f = f, dim = length(vars), sym = vars)
 end
 
 ## allocation free oop aggregator. might be more difficult for more-dimensional systems
@@ -58,7 +58,7 @@ Well, we could but than we'd get an `ODEEdge` with zero-massmatrix.
 =#
 @parameters v₁(t) v₂(t) K
 edge_ip = build_function([K*sin(v₁[1] - v₂[1])], [v₁], [v₂], K, t, expression=Val{false})[2]
-edge = StaticEdge(f! = edge_ip, dim = 1, coupling=:antisymmetric)
+edge = StaticEdge(f = edge_ip, dim = 1, coupling=:antisymmetric)
 
 nothing #hide
 #=
