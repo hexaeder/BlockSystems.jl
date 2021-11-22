@@ -134,7 +134,21 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
 
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
-        reduced_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
+        neweqs = eq.lhs ~ recursive_substitute(eq.rhs, rules)
+        type, lhs_var = eq_type(neweqs)
+        if type == :implicit_algebraic && !isnothing(lhs_var)
+            verbose && print("Algebraic substitution resulted in implicit equation...")
+            # TODO: solve_for implicit algebraic equations
+            # try
+            #     neweqs = lhs_var ~ Symbolics.solve_for(neweqs, lhs_var)
+            #     verbose && println("which could be solved: $neweqs")
+            # catch e
+            #   e isa AssertionError || rethrow(e)
+                neweqs = 0 ~ neweqs.rhs - neweqs.lhs
+                verbose && println("which was transformed to `0 ~ f(...)` form: $neweqs")
+            # end
+        end
+        reduced_eqs[i] = neweqs
     end
 
     # also substitute in the allready removed_eqs

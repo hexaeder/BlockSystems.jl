@@ -14,6 +14,6 @@ while run
 
     println("Run again? Enter! Exit witn 'q'.")
     if readline() == "q"
-        run = false
+        global run = false
     end
 end
