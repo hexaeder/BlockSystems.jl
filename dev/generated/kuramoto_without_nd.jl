@@ -1,4 +1,4 @@
-using LightGraphs
+using Graphs
 using BlockSystems
 using ModelingToolkit
 using OrdinaryDiffEq
