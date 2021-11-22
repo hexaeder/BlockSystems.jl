@@ -61,11 +61,28 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     rem_states = vcat(f_rem_states, ios.removed_states) |> unique
 
     # warning
-    if warn && (length(f_states) != length(states) ||
-                length(f_inputs) != length(inputs) ||
-                length(f_params) != length(params) ||
-                length(f_rem_states) != length(rem_states))
-        @warn "The ordering of the states/inputs/params/rem_states might change from run to run. Therefore it is highly recommend to provide all variables in the f_* arguments" states inputs params
+    if warn
+        incomplete = false
+        warnstr = ""
+        if length(f_states) != length(states)
+            incomplete = true
+            warnstr *= "f_states, "
+        end
+        if length(f_inputs) != length(inputs)
+            incomplete = true
+            warnstr *= "f_inputs, "
+        end
+        if length(f_params) != length(params)
+            incomplete = true
+            warnstr *= "f_params, "
+        end
+        if length(f_rem_states) != length(rem_states)
+            incomplete = true
+            warnstr *= "f_rem_states"
+        end
+        if incomplete
+            @warn "The ordering of the states might change in future versions. Therefore it is highly recommend to provide all variables in the f_* arguments. There are missing entrys in" * warnstr[begin:end-2] * " are missing some entrys!"
+        end
     end
 
     # reorder the equations to get du in the right order

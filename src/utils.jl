@@ -1,19 +1,96 @@
 """
-   check(cond, msg)
+    @check cond msg
 
 If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
 """
-macro check(cond::Expr, msg)
-    head = lstrip(repr(cond), ':')
-    head = head * " == false"
-    args = ()
-    for (i,a) in enumerate(cond.args[2:end])
-        lhs = lstrip(repr(a), ':')
-        symbol = (i == length(cond.args)-1) ? "└ " : "├ "
-        args  = (args..., :("\n   " * $symbol * $lhs * " = " * repr($(esc(a)))))
+macro check(cond, msg)
+    _chkmacro(:error, cond, msg)
+end
+
+"""
+    @checkwarn [showwarn] cond msg
+
+If `cond` evaluates false warn and print evaluation of `cond`.
+If optional argument `showwarn=false` hide warning.
+"""
+macro checkwarn(cond, msg)
+    _chkmacro(:(:warn), cond, msg)
+end
+
+macro checkwarn(showarn, cond, msg)
+    newlevel = quote
+        if !$showarn
+            :silent
+        else
+            :warn
+        end
     end
-    return :($(esc(cond)) ||
-             throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...))))
+    _chkmacro(newlevel, cond, msg)
+end
+
+"""
+    _chkmacro(level, cond, msg)
+
+Check condition an react based on level:
+- `:error`: Argument error
+- `:warn`: warning
+- `:silent`: nothing
+"""
+function _chkmacro(level, cond, msg)
+    head = lstrip(repr(cond), ':')
+    if head[begin] == '(' && head[end] == ')'
+        head = head[begin+1:end-1]
+    end
+    head = head * " evaluated false"
+
+    args = Expr[]
+
+    if cond.args[1] == :(!)
+        _expr_repr_list!(args, cond.args[2].args[2:end])
+    elseif cond.args[1] == :(⊆)
+        push!(args, :("\n   ├ set diff = " * _shortrepr(setdiff($(esc(cond.args[2])), $(esc(cond.args[3]))))))
+        _expr_repr_list!(args, cond.args[2:end])
+    elseif cond.args[1] == :(⊇)
+        push!(args, :("\n   ├ set diff = " * _shortrepr(setdiff($(esc(cond.args[3])), $(esc(cond.args[2]))))))
+        _expr_repr_list!(args, cond.args[2:end])
+    elseif cond.args[1] == :(uniquenames) || cond.args[1] == :(allunique)
+        push!(args, :("\n   ├ duplicates = " * _shortrepr(duplicates($(esc(cond.args[2]))))))
+        _expr_repr_list!(args, cond.args[2:end])
+    else
+        _expr_repr_list!(args, cond.args[2:end])
+    end
+
+    return :(if $(esc(level)) !== :silent && !$(esc(cond))
+                 str = $(esc(msg)) * "\n  " * $head * $(args...)
+                 if $(esc(level)) === :warn
+                     @warn str
+                 else
+                     throw(ArgumentError(str))
+                 end
+             end)
+end
+
+function _expr_repr_list!(list, expressions)
+    for (i,a) in enumerate(expressions)
+        lhs = lstrip(repr(a), ':') # remove leading : on symbols
+        if lhs[begin] == '(' && lhs[end] == ')'
+            lhs = lhs[begin+1:end-1]
+        end
+        symbol = (i == length(expressions)) ? "└ " : "├ "
+        push!(list, :("\n   " * $symbol * $lhs * " = " * _shortrepr($(esc(a)))))
+    end
+end
+
+_shortrepr(x) = repr(x)
+function _shortrepr(x::Set)
+    isempty(x) && return "(empty)"
+    m = match(r"\[(.*)\]\)$", repr(x))
+    return m[1]
+end
+function _shortrepr(x::AbstractArray)
+    isempty(x) && return "(empty)"
+    m = match(r"\[(.*)\]$", repr(x))
+    return m[1]
 end
 
 """
@@ -41,6 +118,20 @@ remove_namespace(x::Term) = rename(x, remove_namespace(operation(x).name))
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 
 uniquenames(syms) = allunique(getname.(syms))
+
+function duplicates(X)
+    X = collect(X)
+    dups = Set{eltype(X)}()
+    for (i, x) in enumerate(X)
+        for j in i+1:lastindex(X)
+            if isequal(x, X[j])
+                push!(dups, x)
+                break
+            end
+        end
+    end
+    return dups
+end
 
 """
     eq_type(eq::Equation)

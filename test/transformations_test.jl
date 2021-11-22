@@ -95,12 +95,12 @@ end
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
-               o2 ~ y + o1]
+               o2 ~ y + 2*o1]
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          o1 ~ x + (y + o1)]
-        @test reqs.removed_eqs == [o2 ~ y + o1]
+                          0 ~ x + (y+2*o1) - o1]
+        @test reqs.removed_eqs == [o2 ~ y + 2*o1]
 
         rreqs = substitute_algebraic_states(IOBlock(equations(reqs), [],[x,y]))
         @test equations(rreqs) == equations(reqs)
@@ -116,17 +116,17 @@ end
         eqs = [D(x) ~ i,
                o1 ~ x + o2,
                D(y) ~ i,
-               o2 ~ y + o1]
+               o2 ~ y + 2*o1]
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o1]))
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          o1 ~ x + (y + o1)]
-        @test reqs.removed_eqs == [o2 ~ y + o1]
+                          0 ~ x + (y + 2*o1) - o1]
+        @test reqs.removed_eqs == [o2 ~ y + 2*o1]
 
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o2]))
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          o2 ~ y + (x + o2)]
+                          0 ~ y + 2*(x + o2) - o2]
         @test reqs.removed_eqs == [o1 ~ x + o2]
     end
 

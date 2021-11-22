@@ -59,32 +59,24 @@ struct IOBlock <: AbstractIOSystem
     removed_states::Vector{Symbolic}
     removed_eqs::Vector{Equation}
 
-    function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs)
-        @check name == odes.name "Name of inner ODESystem does not match name of IOBlock"
-        @check Set(inputs) ⊆ Set(parameters(odes)) "inputs must be parameters"
-        # XXX: temp. disable check: outputs may be completely implicit at block level
-        # @check Set(outputs) ⊆ Set(states(odes)) "outputs must be variables"
-        @check Set(iparams) ⊆ Set(parameters(odes)) "iparams must be parameters"
-        @check Set(istates) ⊆ Set(states(odes)) "istates must be variables"
-        @check Set(inputs ∪ iparams) == Set(parameters(odes)) "inputs ∪ iparams != params"
-        # XXX: see above
-        # @check Set(outputs ∪ istates) == Set(states(odes)) "outputs ∪ istates != states"
+    function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs; warn)
+        @check name == getname(odes) "Name of inner ODESystem does not match name of IOBlock"
+        @checkwarn warn Set(inputs) ⊆ Set(parameters(odes)) "Inputs should be parameters. You may ignore this warning if you want to speciy an input which is not used in the eqs."
+        @checkwarn warn Set(outputs) ⊆ Set(states(odes)) "Outputs should be variables. You may ignore this waring if you want to specify an output which is not used in the eqs (completly implicit)."
+        @checkwarn warn Set(iparams) ⊆ Set(parameters(odes)) "iparams should be parameters of the eqs system"
+        @checkwarn warn Set(istates) ⊆ Set(states(odes)) "istates should be variables of the eqs system"
+        @check Set(parameters(odes)) ⊆ Set(inputs ∪ iparams) "params(eqs) ⊆ inputs ∪ iparams"
+        @check Set(states(odes)) ⊆ Set(outputs ∪ istates) "states(eqs) ⊆ outputs ∪ istates"
 
         # lhs of the equation should be either differential of state/output
         for eq in equations(odes)
-            lhs = eq.lhs
-            if istree(lhs)
-                if (operation(lhs) isa Differential) && arguments(lhs)[1] ∈ Set(istates ∪ outputs)
-                    # this is fine
-                elseif lhs ∈ Set(istates ∪ outputs)
-                    # this is fine
-                else
-                    throw(ArgumentError("$eq : unexpected lhs of equation! LHS shoud be either x or ∂x/∂t where x ∈ istates ∪ outputs!"))
-                end
-            else
-                if !isequal(lhs, 0)
-                    throw(ArgumentError("$eq : unexpected lhs of equation! Please write constrains in the form 0 ~ f(⋅)"))
-                end
+            (type, lhs_var) = eq_type(eq)
+            if type === :diffeq
+                @check lhs_var ∈ Set(istates ∪ outputs) "$eq : Lhs variable of diff eqs should be istate or output."
+            elseif type === :explicit_algebraic
+                @check lhs_var ∈ Set(istates ∪ outputs) "$eq : Lhs variable of explicit algebraic eqs should be istate or output."
+            elseif type === :implicit_algebraic
+                @checkwarn warn isnothing(lhs_var) "$eq : Please provide constraints in form `0 ~ f(...)`."
             end
         end
 
@@ -92,13 +84,13 @@ struct IOBlock <: AbstractIOSystem
         all_vars = vcat(inputs, outputs, istates, iparams, get_iv(odes))
         @check uniquenames(all_vars) "There seem to be a name clashes between inputs, iparams istates and outputs!"
         all_vars = Set(all_vars)
-        @check additional_vars ⊆ all_vars "removed eqs should not contain new variables"
+        @checkwarn warn additional_vars ⊆ all_vars "Removed eqs should not contain new variables. This may be a bug since this feature is not fully implemented."
 
         if isempty(rem_eqs)
             rem_states = Symbolic[]
         else
             rem_states = lhs_var.(rem_eqs)
-            @check isempty(rem_states ∩ all_vars) "removed states should not appear in in/out/is/ip"
+            @checkwarn warn isempty(rem_states ∩ all_vars) "removed states should not appear in in/out/is/ip equations"
             rem_rhs_vars = union([get_variables(eq.rhs) for eq in rem_eqs]...)
             if !(rem_rhs_vars ⊆ all_vars)
                 remaining = setdiff(rem_rhs_vars, all_vars)
@@ -137,11 +129,11 @@ D = Differential(t)
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing)
-    IOBlock(name, eqs, inputs, outputs, Equation[]; iv)
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=true)
+    IOBlock(name, eqs, inputs, outputs, Equation[]; iv, warn)
 end
 
-function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing)
+function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=true)
     os = ODESystem(eqs, iv; name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -149,7 +141,7 @@ function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing)
     istates = setdiff(get_states(os), outputs)
     iparams = setdiff(parameters(os), inputs)
 
-    IOBlock(name, inputs, iparams, istates, outputs, os, rem_eqs)
+    IOBlock(name, inputs, iparams, istates, outputs, os, rem_eqs; warn)
 end
 
 
@@ -158,10 +150,10 @@ $(SIGNATURES)
 
 Construct a new IOBlock based on an existing. Deep-copy all fields and assigns new name.
 """
-function IOBlock(iob::IOBlock; name=gensym(:IOBlock))
+function IOBlock(iob::IOBlock; name=gensym(:IOBlock), warn=true)
     cp = deepcopy(iob)
     odes = ODESystem(get_eqs(cp.system), get_iv(cp), name=name)
-    IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs)
+    IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs; warn)
 end
 
 """
