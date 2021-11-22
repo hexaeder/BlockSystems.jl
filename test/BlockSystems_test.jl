@@ -48,7 +48,7 @@ using Graphs
         @variables x(t) y(t)
         D = Differential(t)
         IOBlock([x ~ 2 + a], [], [x])
-        IOBlock([D(y) ~ 2 + a], [], [x])
+        @test_throws ArgumentError IOBlock([D(y) ~ 2 + a], [], [x])
 
         @test_throws ArgumentError IOBlock([a ~ 2 + x], [], [x])
         @test_throws ArgumentError IOBlock([p ~ 2 + x], [p], [x], iv=t)

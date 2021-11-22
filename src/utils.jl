@@ -1,24 +1,84 @@
 """
-   check(cond, msg)
+    @check [level] cond msg
 
 If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
+Optionally 'lower' the level:
+- `:warn`: show warning
+- `:silent`: do nothing
 """
-macro check(cond::Expr, msg)
-    head = lstrip(repr(cond), ':')
-    head = head * " == false"
-    args = ()
-    for (i,a) in enumerate(cond.args[2:end])
-        lhs = lstrip(repr(a), ':')
-        symbol = (i == length(cond.args)-1) ? "└ " : "├ "
-        args  = (args..., :("\n   " * $symbol * $lhs * " = " * repr($(esc(a)))))
+macro check(level, cond, msg)
+    _chkmacro(level, cond, msg)
+end
+
+macro check(cond, msg)
+    _chkmacro(:error, cond, msg)
+end
+
+"""
+    @checkwarn [level] cond msg
+
+If `cond` evaluates false warn and print evaluation of `cond`.
+Optionally 'lower' the level:
+- `:silent`: do nothing
+"""
+macro checkwarn(cond, msg)
+    _chkmacro(:(:warn), cond, msg)
+end
+
+macro checkwarn(level, cond, msg)
+    newlevel = quote
+        if $level === :silent
+            :silent
+        else
+            :warn
+        end
     end
-    # return :($(esc(cond)) ||
-    #          throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...))))
+    _chkmacro(newlevel, cond, msg)
+end
+
+function _chkmacro(level, cond, msg)
+    head = lstrip(repr(cond), ':')
+    head = head * " evaluated false"
+
+    args = Expr[]
+
+    if cond.args[1] == :(!)
+        _expr_repr_list!(args, cond.args[2].args[2:end])
+    elseif cond.args[1] == :(⊆)
+        push!(args, :("\n   ├ set diff " * _shortrepr(setdiff($(esc(cond.args[2])), $(esc(cond.args[3]))))))
+        _expr_repr_list!(args, cond.args[2:end])
+    elseif cond.args[1] == :(⊇)
+        push!(args, :("\n   ├ set diff " * _shortrepr(setdiff($(esc(cond.args[3])), $(esc(cond.args[2]))))))
+        _expr_repr_list!(args, cond.args[2:end])
+    else
+        _expr_repr_list!(args, cond.args[2:end])
+    end
+
     return :(if !$(esc(cond))
-                 # throw(ArgumentError($(esc(msg)) * "\n  " * $head * $(args...)))
-                 @warn $(esc(msg)) * "\n  " * $head * $(args...)
+                 str = $(esc(msg)) * "\n  " * $head * $(args...)
+                 if $(esc(level)) === :warn
+                     @warn str
+                 elseif $(esc(level)) === :silent
+                 else
+                     throw(ArgumentError(str))
+                 end
              end)
 end
+
+function _expr_repr_list!(list, expressions)
+    for (i,a) in enumerate(expressions)
+        lhs = lstrip(repr(a), ':') # remove leading : on symbols
+        if lhs[begin] == '(' && lhs[end] == ')'
+            lhs = lhs[begin+1:end-1]
+        end
+        symbol = (i == length(expressions)) ? "└ " : "├ "
+        push!(list, :("\n   " * $symbol * $lhs * " = " * _shortrepr($(esc(a)))))
+    end
+end
+
+_shortrepr(x) = repr(x)
+_shortrepr(x::Set) = "Set"*match(r"\[.*\]\)$", repr(x)).match
+
 
 """
     remove_namespace(namespace, x)
