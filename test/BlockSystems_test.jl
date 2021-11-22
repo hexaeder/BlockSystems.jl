@@ -2,7 +2,7 @@ using Test
 using BlockSystems
 using ModelingToolkit
 using ModelingToolkit: get_iv, get_eqs, get_states, value
-using LightGraphs
+using Graphs
 
 @info "Tests of BlockSystems.jl"
 

@@ -10,7 +10,7 @@ using BlockSystems
 using Plots
 using OrdinaryDiffEq
 using ModelingToolkit
-using LightGraphs
+using Graphs
 using NetworkDynamics
 
 

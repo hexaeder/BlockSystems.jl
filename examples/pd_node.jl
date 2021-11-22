@@ -173,7 +173,7 @@ function construct_vertex(ion::IONode)
         i = total_current(e_s, e_d)
         gen.f_ip(dx, x, (real(i), imag(i)), ion.parameters, t)
     end
-    ODEVertex(f! = rhs!, dim = length(gen.states), mass_matrix = gen.massm, sym = Symbol.(gen.states))
+    ODEVertex(f = rhs!, dim = length(gen.states), mass_matrix = gen.massm, sym = Symbol.(gen.states))
 end
 
 import PowerDynamics.symbolsof
@@ -260,14 +260,14 @@ using Test
 
         ## create IONode
         node_bs = IONode(connected, para)
-        f_bs = construct_vertex(node_bs).f!
+        f_bs = construct_vertex(node_bs).f
 
         ## create PDNode
         ## the PD node does not have the explicit ω_r parameter
         para_pd = delete!(copy(para), :ω_r)
         nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
         node_pd = VSIVoltagePT1(; nt...)
-        f_pd = construct_vertex(node_pd).f!
+        f_pd = construct_vertex(node_pd).f
 
         ## create fake "edge data", 4 incoming, 4 outgooing with 4 states each
         es = [randn(4) for i in 1:4]
@@ -310,11 +310,11 @@ para = Dict(:τ_v=>rand(),:τ_P=>rand(), :τ_Q=>rand(),
             :P=>rand(), :Q=>rand(), :ω_r=>0.0)
 
 node_bs = IONode(connected, para)
-f_bs = construct_vertex(node_bs).f!
+f_bs = construct_vertex(node_bs).f
 para_pd = delete!(copy(para), :ω_r)
 nt = NamedTuple{Tuple(keys(para_pd))}(values(para_pd))
 node_pd = VSIVoltagePT1(; nt...)
-f_pd = construct_vertex(node_pd).f!
+f_pd = construct_vertex(node_pd).f
 
 es = [randn(4) for i in 1:4]
 ed = [randn(4) for i in 1:4]

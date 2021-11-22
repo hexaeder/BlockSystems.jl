@@ -6,7 +6,7 @@
 #=
 In this example we model a Kuramoto system on a complex network.
 =#
-using LightGraphs
+using Graphs
 using BlockSystems
 using ModelingToolkit
 using OrdinaryDiffEq
@@ -69,7 +69,7 @@ end
 nothing #hide
 
 #=
-For simplicity our graph will be a simple ring network specified with LightGraphs.jl
+For simplicity our graph will be a simple ring network specified with Graphs.jl
 
 =#
 N = 8
