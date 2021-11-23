@@ -10,7 +10,7 @@ using ModelingToolkit.SymbolicUtils: operation
 @testset "utils.jl" begin
     @testset "check macro" begin
         @variables a b c d
-        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset"
+        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset $a"
         try
             @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
         catch e

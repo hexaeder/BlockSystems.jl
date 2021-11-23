@@ -4,7 +4,12 @@
 If `cond` evaluates false throw `ArgumentError` and print evaluation of `cond`.
 """
 macro check(cond, msg)
-    _chkmacro(:error, cond, msg)
+    str = _chkmsg(cond, msg)
+    quote
+        if !$(esc(cond))
+            throw(ArgumentError($(str)))
+        end
+    end
 end
 
 """
@@ -14,29 +19,30 @@ If `cond` evaluates false warn and print evaluation of `cond`.
 If optional argument `showwarn=false` hide warning.
 """
 macro checkwarn(cond, msg)
-    _chkmacro(:(:warn), cond, msg)
+    str = _chkmsg(cond, msg)
+    quote
+        if !$(esc(cond))
+            @warn $(str)
+        end
+    end
 end
 
 macro checkwarn(showarn, cond, msg)
-    newlevel = quote
-        if !$showarn
-            :silent
-        else
-            :warn
+    str = _chkmsg(cond, msg)
+    quote
+        if $(esc(showarn)) && !$(esc(cond))
+            @warn $(str)
         end
     end
-    _chkmacro(newlevel, cond, msg)
 end
 
 """
-    _chkmacro(level, cond, msg)
+    _chkmsg(cond, msg)
 
-Check condition an react based on level:
-- `:error`: Argument error
-- `:warn`: warning
-- `:silent`: nothing
+Create an expression which evaluates as a error string which contrains the original msg and
+some debug information based on the condition.
 """
-function _chkmacro(level, cond, msg)
+function _chkmsg(cond, msg)
     head = lstrip(repr(cond), ':')
     if head[begin] == '(' && head[end] == ')'
         head = head[begin+1:end-1]
@@ -59,15 +65,7 @@ function _chkmacro(level, cond, msg)
     else
         _expr_repr_list!(args, cond.args[2:end])
     end
-
-    return :(if $(esc(level)) !== :silent && !$(esc(cond))
-                 str = $(esc(msg)) * "\n  " * $head * $(args...)
-                 if $(esc(level)) === :warn
-                     @warn str
-                 else
-                     throw(ArgumentError(str))
-                 end
-             end)
+    return :($(esc(msg)) * "\n  " * $head * $(args...))
 end
 
 function _expr_repr_list!(list, expressions)
@@ -82,14 +80,14 @@ function _expr_repr_list!(list, expressions)
 end
 
 _shortrepr(x) = repr(x)
-function _shortrepr(x::Set)
+function _shortrepr(@nospecialize x::Set)
     isempty(x) && return "(empty)"
-    m = match(r"\[(.*)\]\)$", repr(x))
+    m = match(r"\[(.*)\]\)$", repr(x)::String)
     return m[1]
 end
-function _shortrepr(x::AbstractArray)
+function _shortrepr(@nospecialize x::AbstractArray)
     isempty(x) && return "(empty)"
-    m = match(r"\[(.*)\]$", repr(x))
+    m = match(r"\[(.*)\]$", repr(x)::String)
     return m[1]
 end
 
