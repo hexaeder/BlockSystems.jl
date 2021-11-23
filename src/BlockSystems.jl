@@ -24,11 +24,15 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     if name ∈ fieldnames(typeof(sys))
         return getfield(sys, name)
     end
-    syms = vcat(sys.inputs, sys.iparams, sys.istates, sys.outputs, sys.removed_states)
+    syms = vcat(getfield(sys, :inputs),
+                getfield(sys, :iparams),
+                getfield(sys, :istates),
+                getfield(sys, :outputs),
+                getfield(sys, :removed_states))
 
     i = findfirst(x -> getname(x) == name, syms)
     if i !== nothing
-        return rename(syms[i], renamespace(sys.name, name))
+        return rename(syms[i], renamespace(getfield(sys, :name), name))
     end
     throw(error("Variable $name does not exist"))
 end

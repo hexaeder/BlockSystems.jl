@@ -354,14 +354,14 @@ end
 
 
 """
-    set_p(blk::IOBlock, p::Dict)
-    set_p(blk::IOBlock, p::Pair)
+    set_p(blk::IOBlock, p::Dict; warn=true)
+    set_p(blk::IOBlock, p::Pair; warn=true)
 
 Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters.
 
 Keys of dict can be either `Symbols` or the `Sybolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
 """
-function set_p(blk::IOBlock, p::Dict)
+function set_p(blk::IOBlock, p::Dict; warn=true)
     subs = Dict{Symbolic, Float64}()
     validp = Set(blk.iparams)
     for k in keys(p)
@@ -381,7 +381,7 @@ function set_p(blk::IOBlock, p::Dict)
     end
     eqs     = map(eq->eqsubstitute(eq, subs), equations(blk))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk))
+    IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk), warn)
 end
 
-set_p(blk::IOBlock, p...) = length(p) > 1 ? set_p(blk, Dict(p)) : set_p(blk, Dict(only(p)))
+set_p(blk::IOBlock, p...; warn=true) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
