@@ -353,6 +353,9 @@ end
         blk2 = set_p(blk, Dict(blk.a=>2, b=>4))
         @test equations(blk2) == [D(x) ~ 9 + D(y)]
 
+        blk2 = set_p(blk, blk.a=>2, b=>4; warn=false)
+        @test equations(blk2) == [D(x) ~ 9 + D(y)]
+
         @test_throws ArgumentError blk2 = set_p(blk, :a=>:bla)
         @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
     end
