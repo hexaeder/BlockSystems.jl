@@ -87,7 +87,7 @@ using ModelingToolkit.SymbolicUtils: operation
         using BlockSystems
         using BlockSystems: eq_type
         @parameters t
-        @variables x(t) y
+        @variables x(t) y z(t)
         D = Differential(t)
 
         @test eq_type(D(x) ~ 0) == (:explicit_diffeq, x.val)
