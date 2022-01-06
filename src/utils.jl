@@ -135,18 +135,28 @@ end
     eq_type(eq::Equation)
 
 Checks the type of the equation. Returns:
-- `(:diffeq, lhs_variable)` for differential equations
+- `(:explicit_diffeq, lhs_variable)` for explicit differential equations
+- `(:implicit_diffeq, lhs_variable)` for implicit differential equations
 - `(:explicit_algebraic, lhs_variable)` for explicit algebraic equations
 - `(:implicit_algebraic, lhs_variable)` for implicit algebraic equations
+
 """
 function eq_type(eq::Equation)
     if eq.lhs isa Term && operation(eq.lhs) isa Differential
         vars = get_variables(eq.lhs)
-        @check length(vars) == 1 "Diff. eq $eq has more than on variable in lhs!"
-        return (:diffeq, vars[1])
+        @check length(vars) == 1 "Diff. eq $eq has more than one variable in lhs!"
+        return (:explicit_diffeq, vars[1])
     elseif eq.lhs isa Sym || eq.lhs isa Term
         vars = get_variables(eq.lhs)
-        @check length(vars) == 1 "Algebraic eq $eq has more than on variable in lhs!"
+        @check length(vars) == 1 "Algebraic eq $eq has more than one variable in lhs!"
+        diffs = _collect_differentials(eq.rhs)
+        if diffs != Set{SymbolicUtils.Symbolic}()
+            if operation(first(diffs.dict)[1]) isa Differential
+                return (:implicit_diffeq, vars[1])
+            else
+                throw(ArgumentError("Unknown equation type $eq"))
+            end
+        end 
         if vars[1] ∈ Set(get_variables(eq.rhs))
             return (:implicit_algebraic, vars[1])
         else
@@ -155,7 +165,7 @@ function eq_type(eq::Equation)
     elseif isequal(eq.lhs, 0)
         return (:implicit_algebraic, nothing)
     else
-        throw(ArgumentError("Uknnown equation type $eq"))
+        throw(ArgumentError("Unknown equation type $eq"))
     end
 end
 

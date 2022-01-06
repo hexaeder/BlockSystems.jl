@@ -90,14 +90,16 @@ using ModelingToolkit.SymbolicUtils: operation
         @variables x(t) y
         D = Differential(t)
 
-        @test eq_type(D(x) ~ 0) == (:diffeq, x.val)
-        @test eq_type(D(y) ~ 0) == (:diffeq, y.val)
+        @test eq_type(D(x) ~ 0) == (:explicit_diffeq, x.val)
+        @test eq_type(D(y) ~ 0) == (:explicit_diffeq, y.val)
         @test eq_type(x ~ 0) == (:explicit_algebraic, x.val)
         @test eq_type(y ~ 0) == (:explicit_algebraic, y.val)
         @test eq_type(x ~ x^2) == (:implicit_algebraic, x.val)
         @test eq_type(y ~ y^2) == (:implicit_algebraic, y.val)
         @test eq_type(y ~ x^2) == (:explicit_algebraic, y.val)
         @test eq_type(x ~ y^2) == (:explicit_algebraic, x.val)
+        @test eq_type(x ~ D(z)) == (:implicit_diffeq, x.val)
+        @test eq_type(y ~ D(z)) == (:implicit_diffeq, y.val)
         @test eq_type(0 ~ x + y) == (:implicit_algebraic, nothing)
     end
 

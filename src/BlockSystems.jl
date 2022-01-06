@@ -75,7 +75,7 @@ struct IOBlock <: AbstractIOSystem
         # lhs of the equation should be either differential of state/output
         for eq in equations(odes)
             (type, lhs_var) = eq_type(eq)
-            if type === :diffeq
+            if type === :explicit_diffeq
                 @check lhs_var ∈ Set(istates ∪ outputs) "$eq : Lhs variable of diff eqs should be istate or output."
             elseif type === :explicit_algebraic
                 @check lhs_var ∈ Set(istates ∪ outputs) "$eq : Lhs variable of explicit algebraic eqs should be istate or output."
