@@ -149,7 +149,7 @@ In order to simulate the system we can have to build the Julia functions.
 gen = generate_io_function(space_controller)
 nothing # hide
 #=
-By doing so we get access to a named tuple with the fileds
+By doing so we get access to a named tuple with the fields
 - `gen.f_ip` in-place function
 - `gen.f_oop` out-of-place function
 - `gen.massm` mass matrix of the system
