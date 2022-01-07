@@ -53,7 +53,7 @@ function gen_vertex_block(n_edges, name)
     @parameters t ω
     @variables ϕ(t)
     D = Differential(t)
-    ## the way array variables work changed. This is a hack to retrieve the old behvaviour of
+    ## the way array variables work changed. This is a hack to retrieve the old behavior of
     ## this closely mimics the old @parameters edge[1:n_edges](t)
     edge = Num[]
     for i in 1:n_edges

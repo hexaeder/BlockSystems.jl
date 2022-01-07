@@ -198,7 +198,7 @@ end
 function reorder_by_states(eqs::AbstractVector{Equation}, states)
     @assert length(eqs) == length(states) "Numbers of eqs should be equal to states!"
     # for each state, collect the eq_idx which corresponds some states (implicit
-    # agebraic) don't have special equations attached to them those are the "undused_idx"
+    # algebraic) don't have special equations attached to them those are the "undused_idx"
     eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->isequal(s, lhs_var(x)), eqs) for s in states]
     unused_idx = reverse(setdiff(1:length(eqs), eq_idx))
     for i in 1:length(eq_idx)

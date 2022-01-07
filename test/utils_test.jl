@@ -10,9 +10,9 @@ using ModelingToolkit.SymbolicUtils: operation
 @testset "utils.jl" begin
     @testset "check macro" begin
         @variables a b c d
-        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset $a"
+        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Should be subset $a"
         try
-            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Should be subset"
         catch e
             @test e isa ArgumentError
         end

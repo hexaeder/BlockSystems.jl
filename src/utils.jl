@@ -39,7 +39,7 @@ end
 """
     _chkmsg(cond, msg)
 
-Create an expression which evaluates as a error string which contrains the original msg and
+Create an expression which evaluates as a error string which contains the original msg and
 some debug information based on the condition.
 """
 function _chkmsg(cond, msg)
@@ -178,7 +178,7 @@ lhs_var(eq::Equation) = eq_type(eq)[2]
 
 
 """
-    recusive_substitute(term, rules::Dict)
+    recursive_substitute(term, rules::Dict)
 
 Apply substitutions until there is no more change in `term`.
 """

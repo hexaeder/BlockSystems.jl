@@ -65,7 +65,7 @@ struct IOBlock <: AbstractIOSystem
 
     function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs; warn)
         @check name == getname(odes) "Name of inner ODESystem does not match name of IOBlock"
-        @checkwarn warn Set(inputs) ⊆ Set(parameters(odes)) "Inputs should be parameters. You may ignore this warning if you want to speciy an input which is not used in the eqs."
+        @checkwarn warn Set(inputs) ⊆ Set(parameters(odes)) "Inputs should be parameters. You may ignore this warning if you want to specify an input which is not used in the eqs."
         @checkwarn warn Set(outputs) ⊆ Set(states(odes)) "Outputs should be variables. You may ignore this waring if you want to specify an output which is not used in the eqs (completly implicit)."
         @checkwarn warn Set(iparams) ⊆ Set(parameters(odes)) "iparams should be parameters of the eqs system"
         @checkwarn warn Set(istates) ⊆ Set(states(odes)) "istates should be variables of the eqs system"
