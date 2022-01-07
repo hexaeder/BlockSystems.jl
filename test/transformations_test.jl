@@ -349,7 +349,7 @@ end
        sys = connect_system(sys)
        
        @test isequal(sys.removed_eqs, Equation[]) # no equations removed 
-       @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # als rhs differentials have been resolved
+       @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # all rhs differentials have been resolved
        @test isequal(equations(sys), [D(y) ~ x, x ~ x + y])
    end
    
