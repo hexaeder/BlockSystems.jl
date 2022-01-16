@@ -332,6 +332,7 @@ end
                                   y ~ 2 + z,
                                   D(z) ~ 5*x + b]
     end
+
     @testset "Don't remove implicit differential equations" begin
        using BlockSystems:rhs_differentials
    
