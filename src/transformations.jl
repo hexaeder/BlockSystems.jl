@@ -81,7 +81,7 @@ This function removes equations from block, which are not used in order to
 generate the outputs. It looks for equations which have no path to the outputs
 equations in the dependency graph. Returns a new IOBlock.
 
-The removed equations will be not avaiblable as removed quations of the new IOBlock
+The removed equations will be not available as removed equations of the new IOBlock
 
 TODO: Maybe we should try to reduce the inputs to.
 """
@@ -98,7 +98,7 @@ function remove_superfluous_states(iob::IOBlock; verbose=false, warn=true)
     output_idx = [findfirst(x->o ∈ Set(get_variables(x.lhs)), neweqs) for o in outputs]
 
     if any(isnothing, output_idx)
-        verbose && @info "Can't remove souperflous states if outputs implicitly defined."
+        verbose && @info "Can't remove superfluous states if outputs implicitly defined."
         return neweqs
     end
 
@@ -125,7 +125,7 @@ end
 Reduces the number of equations by substituting explicit algebraic equations.
 Returns a new IOBlock with the reduced equations. The removed eqs are stored
 together with the previous `removed_eqs` in the new IOBlock.
-Won't reduce algebraic states which are labeld as `output`.
+Won't reduce algebraic states which are labeled as `output`.
 """
 function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
     reduced_eqs = deepcopy(equations(iob))
@@ -151,7 +151,7 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
         reduced_eqs[i] = neweqs
     end
 
-    # also substitute in the allready removed_eqs
+    # also substitute in the already removed_eqs
     removed_eqs = deepcopy(iob.removed_eqs)
     for (i, eq) in enumerate(removed_eqs)
         removed_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
@@ -170,8 +170,8 @@ end
 """
     _algebraic_substitution_rules(eqs; skip=nothing)
 
-Extract substition rules for explicit algebraic equations in given equations.
-Makes sure that those substitutiosn are pairwise cycle free.
+Extract substitution rules for explicit algebraic equations in given equations.
+Makes sure that those substitutions are pairwise cycle free.
 
 Returns Tuple of substitution dict and corresponding indices of algebraic equations
 in the given equations.
@@ -249,7 +249,7 @@ I.e.
 
 Process happens in multiple steps:
 - try to find explicit equation for differential
-- if none found try to recursivly substitute inside differential with known algebraic states
+- if none found try to recursively substitute inside differential with known algebraic states
 - expand derivatives and try again to substitute with known differentials
 
 """
@@ -268,7 +268,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     algebraic_subs = Dict{Symbolic, Any}()
     function lazy_alg_subs()
         if isempty(algebraic_subs)
-            verbose && println("Lazily initilized algebraic substitutions for substituion of derivatives!")
+            verbose && println("Lazily initialized algebraic substitutions for substitution of derivatives!")
             merge!(algebraic_subs, _algebraic_substitution_rules(eqs)[1])
         end
         return algebraic_subs
@@ -327,11 +327,11 @@ end
     rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
 
 Returns new IOBlock which is similar to blk but with new variable names.
-Variable renamings should be provided as keyword arguments, i.e.
+Variable renaming should be provided as keyword arguments, i.e.
 
     rename_vars(blk; x=:newx, k=:knew)
 
-to rename `x(t)=>newx(t)` and `k=>knew`. Subsitutions can be also provided as
+to rename `x(t)=>newx(t)` and `k=>knew`. Substitutions can be also provided as
 dict of `Symbolic` types (`Sym`s and `Term`s).
 """
 function rename_vars(blk::IOBlock; warn=true, kwargs...)
@@ -359,7 +359,7 @@ end
 
 Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters.
 
-Keys of dict can be either `Symbols` or the `Sybolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
+Keys of dict can be either `Symbols` or the `Symbolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
 """
 function set_p(blk::IOBlock, p::Dict; warn=true)
     subs = Dict{Symbolic, Float64}()

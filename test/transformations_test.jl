@@ -293,7 +293,7 @@ end
 
         @test equations(sysAC.system) == [D(o) ~ 2 + b, D(y) ~ 1 + b]
 
-        # fouth block with more complex stuff
+        # fourth block with more complex stuff
         @variables x(t) y(t)
         B = IOBlock([D(x) ~ a, y ~ x + 3], [], [y])
 
@@ -333,6 +333,27 @@ end
                                   D(z) ~ 5*x + b]
     end
 
+    @testset "Don't remove implicit differential equations" begin
+       using BlockSystems:rhs_differentials
+   
+       @parameters t y(t)
+       D = Differential(t)
+       @variables x(t)
+       
+       blk1 = IOBlock([x ~ y + D(y)], [y], [x]) # implicit differential equation
+       
+       @parameters x(t)
+       @variables y(t)
+       blk2 = IOBlock([D(y) ~ x], [x], [y])
+       
+       sys = IOSystem([blk1.x => blk2.x, blk2.y => blk1.y], [blk1, blk2], outputs = [blk1.x, blk2.y])
+       sys = connect_system(sys)
+       
+       @test isequal(sys.removed_eqs, Equation[]) # no equations removed 
+       @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # all rhs differentials have been resolved
+       @test isequal(equations(sys), [D(y) ~ x, x ~ x + y])
+   end
+   
     @testset "set p" begin
         @parameters t a(t) b
         @variables x(t) y(t) z(t)

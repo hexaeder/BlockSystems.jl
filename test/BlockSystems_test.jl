@@ -143,13 +143,13 @@ using Graphs
         @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2])
 
         iob2 = IOBlock([o ~ i],[i],[o])
-        # mulitiple conneections to same input
+        # multiple connections to same input
         @test_throws ArgumentError IOSystem([iob1.o => iob1.i, iob2.o => iob1.i], [iob1, iob2])
         # make sure that alle of form input => output
         @test_throws ArgumentError IOSystem([iob1.o => iob1.o], [iob1, iob2])
         @test_throws ArgumentError IOSystem([iob1.i => iob1.i], [iob1, iob2])
 
-        # assert that input maps refere to open inputs
+        # assert that input maps refer to open inputs
         @test_throws ArgumentError IOSystem([iob1.o => iob2.i], [iob1, iob2],
                                             namespace_map = [iob2.i => i])
         # assert that rhs of input map is unique

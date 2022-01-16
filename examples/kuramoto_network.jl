@@ -1,6 +1,6 @@
 #=
 ## Integration with `NetworkDynamics.jl`
-In this example we model a Network based on the [Kuroamoto model](https://en.wikipedia.org/wiki/Kuramoto_model) using the [`NetworkDynamics.jl`](https://github.com/FHell/NetworkDynamics.jl) package.
+In this example we model a Network based on the [Kuramoto model](https://en.wikipedia.org/wiki/Kuramoto_model) using the [`NetworkDynamics.jl`](https://github.com/FHell/NetworkDynamics.jl) package.
 =#
 
 using NetworkDynamics

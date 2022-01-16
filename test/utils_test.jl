@@ -10,9 +10,9 @@ using ModelingToolkit.SymbolicUtils: operation
 @testset "utils.jl" begin
     @testset "check macro" begin
         @variables a b c d
-        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Shoud be subset $a"
+        @check Set([a, b, c]) ⊆ Set([a,b,c,d]) "Should be subset $a"
         try
-            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Shoud be subset"
+            @check Set([a, b, c]) ⊆ Set([a,b,d]) "Should be subset"
         catch e
             @test e isa ArgumentError
         end
@@ -87,17 +87,19 @@ using ModelingToolkit.SymbolicUtils: operation
         using BlockSystems
         using BlockSystems: eq_type
         @parameters t
-        @variables x(t) y
+        @variables x(t) y z(t)
         D = Differential(t)
 
-        @test eq_type(D(x) ~ 0) == (:diffeq, x.val)
-        @test eq_type(D(y) ~ 0) == (:diffeq, y.val)
+        @test eq_type(D(x) ~ 0) == (:explicit_diffeq, x.val)
+        @test eq_type(D(y) ~ 0) == (:explicit_diffeq, y.val)
         @test eq_type(x ~ 0) == (:explicit_algebraic, x.val)
         @test eq_type(y ~ 0) == (:explicit_algebraic, y.val)
         @test eq_type(x ~ x^2) == (:implicit_algebraic, x.val)
         @test eq_type(y ~ y^2) == (:implicit_algebraic, y.val)
         @test eq_type(y ~ x^2) == (:explicit_algebraic, y.val)
         @test eq_type(x ~ y^2) == (:explicit_algebraic, x.val)
+        @test eq_type(x ~ D(z)) == (:implicit_diffeq, x.val)
+        @test eq_type(y ~ D(z)) == (:implicit_diffeq, y.val)
         @test eq_type(0 ~ x + y) == (:implicit_algebraic, nothing)
     end
 

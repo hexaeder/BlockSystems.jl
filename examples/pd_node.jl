@@ -108,7 +108,7 @@ i_i -->|         |--> u_i
        +---------+
 ```
 
-We can achieve this by defining a nother block which converts `(i, u) ↦ (P, Q)`
+We can achieve this by defining another block which converts `(i, u) ↦ (P, Q)`
 
 ```
                +----------+  +-------------+
@@ -207,7 +207,7 @@ para = Dict(
     :V_r => 1.0,   # reference/ desired voltage
     :P   => 0.303, # active (real) power infeed
     :Q   => 0.126, # reactive (imag) power infeed                .
-    :ω_r => 0.0)   # refrence/ desired frequency
+    :ω_r => 0.0)   # reference/ desired frequency
 nothing #hide
 
 # Now let's test whether this works in PD...
@@ -269,7 +269,7 @@ using Test
         node_pd = VSIVoltagePT1(; nt...)
         f_pd = construct_vertex(node_pd).f
 
-        ## create fake "edge data", 4 incoming, 4 outgooing with 4 states each
+        ## create fake "edge data", 4 incoming, 4 outgoing with 4 states each
         es = [randn(4) for i in 1:4]
         ed = [randn(4) for i in 1:4]
 
