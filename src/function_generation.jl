@@ -149,6 +149,22 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
 end
 
 """
+    ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false)
+
+Return an `ODEFunction` object with the corresponding mass matrix and variable names.
+"""
+function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false)
+    @check isempty(iob.inputs) "all inputs must be closed"
+    gen = generate_io_function(iob; f_states, f_params, verbose);
+    observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
+    ODEFunction((du,u,p,t) -> gen.f_ip(du,u,nothing,p,t);
+                mass_matrix = gen.massm,
+                syms=Symbol.(gen.states),
+                indepsym=get_iv(iob),
+                observed)
+end
+
+"""
     strip_iv(x, iv)
 
 Strip functional dependency of the independent variable `x(iv) -> x`.
