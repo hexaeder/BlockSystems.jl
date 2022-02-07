@@ -44,6 +44,10 @@ function connect_system(ios::IOSystem;
     for (i, eq) in enumerate(removed_eqs)
         removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
     end
+    # keep connections around in removed states
+    for con in ios.connections
+        push!(removed_eqs, con.second ~ con.first)
+    end
 
     verbose && @info "substitute inputs with outputs" eqs
 

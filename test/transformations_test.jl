@@ -173,13 +173,17 @@ end
         @test iob.name == sys.name
 
         @variables A₊x1(t) A₊x2(t) B₊x1(t) B₊x2(t) A₊o(t) B₊o(t)
+        @variables add₊ina(t) add₊inb(t)
         eqs = [D(A₊x1) ~ a * in1,
                D(A₊x2) ~ in2,
                D(B₊x1) ~ b * in3,
                D(B₊x2) ~ in4,
                out ~ (A₊x1 + A₊x2) + (B₊x1 + B₊x2)]
         @test eqs == get_eqs(iob.system)
-        @test iob.removed_eqs == [A₊o ~ A₊x1 + A₊x2, B₊o ~ B₊x1 + B₊x2]
+        @test iob.removed_eqs == [add₊ina ~ A₊x1 + A₊x2,
+                                  add₊inb ~ B₊x1 + B₊x2,
+                                  A₊o ~ A₊x1 + A₊x2,
+                                  B₊o ~ B₊x1 + B₊x2]
 
         @testset "test rename_vars" begin
             @test_throws ArgumentError new = rename_vars(iob, in2=:in1)
@@ -193,7 +197,10 @@ end
                    D(B₊x2) ~ in4,
                    outN ~ (y + A₊x2) + (B₊x1 + B₊x2)]
             @test eqs == get_eqs(new.system)
-            @test new.removed_eqs == [A₊o ~ y + A₊x2, B₊o ~ B₊x1 + B₊x2]
+            @test new.removed_eqs == [add₊ina ~ y + A₊x2,
+                                      add₊inb ~ B₊x1 + B₊x2,
+                                      A₊o ~ y + A₊x2,
+                                      B₊o ~ B₊x1 + B₊x2]
         end
     end
 
@@ -225,15 +232,18 @@ end
 
         subsysA = connect_system(subsys)
         @test get_eqs(subsysA.system) == [D(x) ~ x]
-        @test Set(subsysA.removed_states) == Set([o])
-        @test subsysA.removed_eqs == [o ~ x]
+        @test Set(subsysA.removed_states) ⊇ Set([o])
+        @test subsysA.removed_eqs == [b1.i ~ x,
+                                      b2.i ~ x,
+                                      o ~ x]
 
         subsysB = IOBlock(subsysA, name=:B)
         @test subsysB.name == :B
         @test subsysB.system.name == :B
         @test get_eqs(subsysB.system) == [D(x) ~ x]
-        @test Set(subsysB.removed_states) == Set([o])
-        @test subsysB.removed_eqs == [o ~ x]
+        @test Set(subsysB.removed_states) == Set([b1.i, b2.i, o])
+        subsysB.removed_states
+        @test subsysB.removed_eqs == [b1.i~x, b2.i~x, o ~ x]
 
         @parameters a1(t) a2(t)
         adder = IOBlock([o ~ a1 + a2], [a1, a2], [o], name=:add)
@@ -241,14 +251,14 @@ end
         system = IOSystem([subsysA.x => adder.a1, subsysB.x => adder.a2],
                           [adder, subsysA, subsysB])
 
-        @test Set(system.removed_states) == Set([subsysA.o, subsysB.o])
+        @test Set(system.removed_states) ⊇ Set([subsysA.o, subsysB.o])
 
         systemblock = connect_system(system)
         @test systemblock.system.name == systemblock.name == system.name
-        @test Set(systemblock.removed_states) == Set(system.removed_states)
+        @test Set(systemblock.removed_states) ⊇ Set(system.removed_states)
 
         using BlockSystems: namespace_rem_eqs
-        @test systemblock.removed_eqs == vcat(namespace_rem_eqs(subsysA), namespace_rem_eqs(subsysB))
+        @test systemblock.removed_eqs ⊇ vcat(namespace_rem_eqs(subsysA), namespace_rem_eqs(subsysB))
 
         # psst, i'm putting a test for function_generation here, don't tell ma
         gen = generate_io_function(systemblock,
@@ -258,13 +268,13 @@ end
         @test Set(gen.states) == Set(Sym{Real}.([:B₊x, :A₊x, :add₊o]))
         @test Set(gen.inputs) == Set()
         @test Set(gen.params) == Set()
-        @test Set(gen.rem_states) == Set(Sym{Real}.([:B₊o, :A₊o]))
+        @test Set(gen.rem_states) ⊇ Set(Sym{Real}.([:B₊o, :A₊o]))
 
-        out = zeros(2)
+        out = zeros(8)
         st = rand(3)
         gen.g_ip(out, st, (), (), (), 0.0)
-        @test out == st[1:2]
-        @test gen.g_oop(st, (), (), (), 0.0) == st[1:2]
+        @test out[1:2] == st[1:2]
+        @test gen.g_oop(st, (), (), (), 0.0)[1:2] == st[1:2]
     end
 
     @testset "substitution of differential states" begin
@@ -351,7 +361,6 @@ end
         sys = IOSystem([blk1.x => blk2.x, blk2.y => blk1.y], [blk1, blk2], outputs = [blk1.x, blk2.y])
         sys = connect_system(sys)
 
-        @test isequal(sys.removed_eqs, Equation[]) # no equations removed
         @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # all rhs differentials have been resolved
         @test isequal(equations(sys), [D(y) ~ x, 0 ~ y])
     end
@@ -409,7 +418,7 @@ end
         @test equations(blk2) == [o ~ 8]
 
         @test blk.name == blk2.name
-        @test blk2.removed_eqs == [i~4]
+        @test blk2.removed_eqs ⊇ [i~4]
 
         @parameters a(t)
         blk2 = set_input(blk, :i=>a)
