@@ -365,14 +365,11 @@ function set_p(blk::IOBlock, p::Dict; warn=true)
     subs = Dict{Symbolic, Float64}()
     validp = Set(blk.iparams)
     for k in keys(p)
-        if k isa Symbol
+        try
             sym = getproperty(blk, k)
-        elseif k isa Num
-            sym = value(k)
-        elseif k isa Symbolic
-            sym = k
-        else
-            error("Can't use $k, wrong type $(typeof(k))")
+        catch
+            warn && @warn "Symbol $k not present in block. Skipped."
+            continue
         end
         sym = remove_namespace(blk.name, sym)
         @check sym ∈ validp "Symbol $sym is not iparam of block"

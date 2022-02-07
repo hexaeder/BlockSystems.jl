@@ -37,6 +37,13 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     throw(error("Variable $name does not exist"))
 end
 
+function Base.getproperty(sys::AbstractIOSystem, sym::Symbolic)
+    sym = remove_namespace(sys.name, sym)
+    getproperty(sys, getname(sym))
+end
+
+Base.getproperty(sys::AbstractIOSystem, num::Num) = getproperty(sys, value(num))
+
 function namespace_property(ios::AbstractIOSystem, prop::Symbol)
     [rename(sym, renamespace(ios.name, getname(sym)))
      for sym in getproperty(ios, prop)]

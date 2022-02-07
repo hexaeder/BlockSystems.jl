@@ -365,10 +365,14 @@ end
         @test equations(blk2) == [D(x) ~ 1 + D(y)]
         blk2 = set_p(blk, blk.a=>0)
         @test equations(blk2) == [D(x) ~ 1 + D(y)]
+        blk2 = set_p(blk, a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y)]
 
         blk2 = set_p(blk, :b=>1)
         @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
         blk2 = set_p(blk, blk.b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
+        blk2 = set_p(blk, b=>1)
         @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
 
         blk2 = set_p(blk, Dict(blk.a=>2, b=>4))
