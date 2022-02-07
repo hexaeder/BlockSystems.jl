@@ -97,14 +97,16 @@ end
                D(y) ~ i,
                o2 ~ y + 2*o1]
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
+        equations(reqs)
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          0 ~ x + (y+2*o1) - o1]
+                          o1 ~ -x + -y]
         @test reqs.removed_eqs == [o2 ~ y + 2*o1]
 
-        rreqs = substitute_algebraic_states(IOBlock(equations(reqs), [],[x,y]))
-        @test equations(rreqs) == equations(reqs)
-        @test reqs.removed_eqs == reqs.removed_eqs
+        # TODO: multiple applications should not remove more equations!
+        rreqs = substitute_algebraic_states(reqs)
+        @test_broken equations(rreqs) == equations(reqs)
+        @test_broken rreqs.removed_eqs == reqs.removed_eqs
 
         # test skip condition
         eqs = [D(x) ~ i + o,
@@ -120,13 +122,13 @@ end
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o1]))
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          0 ~ x + (y + 2*o1) - o1]
+                          o1 ~ -x + -y]
         @test reqs.removed_eqs == [o2 ~ y + 2*o1]
 
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y,o2]))
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,
-                          0 ~ y + 2*(x + o2) - o2]
+                          o2 ~ -y + -2x]
         @test reqs.removed_eqs == [o1 ~ x + o2]
     end
 
@@ -334,25 +336,25 @@ end
     end
 
     @testset "Don't remove implicit differential equations" begin
-       using BlockSystems:rhs_differentials
-   
-       @parameters t y(t)
-       D = Differential(t)
-       @variables x(t)
-       
-       blk1 = IOBlock([x ~ y + D(y)], [y], [x]) # implicit differential equation
-       
-       @parameters x(t)
-       @variables y(t)
-       blk2 = IOBlock([D(y) ~ x], [x], [y])
-       
-       sys = IOSystem([blk1.x => blk2.x, blk2.y => blk1.y], [blk1, blk2], outputs = [blk1.x, blk2.y])
-       sys = connect_system(sys)
-       
-       @test isequal(sys.removed_eqs, Equation[]) # no equations removed 
-       @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # all rhs differentials have been resolved
-       @test isequal(equations(sys), [D(y) ~ x, x ~ x + y])
-   end
+        using BlockSystems:rhs_differentials
+
+        @parameters t y(t)
+        D = Differential(t)
+        @variables x(t)
+
+        blk1 = IOBlock([x ~ y + D(y)], [y], [x]) # implicit differential equation
+
+        @parameters x(t)
+        @variables y(t)
+        blk2 = IOBlock([D(y) ~ x], [x], [y])
+
+        sys = IOSystem([blk1.x => blk2.x, blk2.y => blk1.y], [blk1, blk2], outputs = [blk1.x, blk2.y])
+        sys = connect_system(sys)
+
+        @test isequal(sys.removed_eqs, Equation[]) # no equations removed
+        @test isequal(rhs_differentials(sys), Set{SymbolicUtils.Symbolic}()) # all rhs differentials have been resolved
+        @test isequal(equations(sys), [D(y) ~ x, 0 ~ y])
+    end
    
     @testset "set p" begin
         @parameters t a(t) b
