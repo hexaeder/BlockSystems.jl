@@ -153,9 +153,9 @@ end
 
 Return an `ODEFunction` object with the corresponding mass matrix and variable names.
 """
-function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false)
+function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=true)
     @check isempty(iob.inputs) "all inputs must be closed"
-    gen = generate_io_function(iob; f_states, f_params, verbose);
+    gen = generate_io_function(iob; f_states, f_params, verbose, warn);
     observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
     ODEFunction((du,u,p,t) -> gen.f_ip(du,u,nothing,p,t);
                 mass_matrix = gen.massm,
