@@ -1,3 +1,99 @@
+function _uncouple_algebraic_equations(eqs; verbose=true)
+    eqs = copy(eqs)
+    g = _dependency_graph(eqs)
+
+    keep = Int[]
+    for set in cyclebreaking_vertices(g)
+        if length(set) == 1
+            push!(keep, only(set))
+        else
+            # TODO: add heuristik which equation to keep
+           push!(keep, last(set))
+        end
+    end
+
+    _uncouple_algebraic_equations!(eqs, g, keep)
+
+    uncouple_again = false
+    for i in keep
+        (type, lhs_var) = eq_type(eqs[i])
+        if type === :explicit_algebraic
+            uncouple_again = true
+        elseif type === :implicit_algebraic
+            @assert !isnothing(lhs_var) "Why is it nothing? Should not happen!"
+            eq = eqs[i]
+            verbose && println("    Substitution resulted in implicit equation and was transformed!")
+            verbose && println("      ├ ", eq)
+            eq = 0 ~ simplify(eq.rhs - eq.lhs)
+            if lhs_var ∈ Set(get_variables(eq.rhs))
+                try
+                    eq = lhs_var ~ Symbolics.solve_for(eq, lhs_var)
+                    uncouple_again = true
+                catch e
+                    verbose && println("      ├ could not be resolved!")
+                    uncouple_again = false
+                end
+            end
+            verbose && println("      └ $eq")
+            eqs[i] = eq
+        end
+    end
+
+    rules = Dict(eqs[i].lhs => eqs[i].rhs for i in eachindex(eqs) if i ∉ keep)
+    if uncouple_again
+        println("Not possible yet!")
+    end
+    return (rules, keep)
+end
+
+function _uncouple_algebraic_equations!(eqs, g::SimpleDiGraph, keep::Vector{Int})
+    gcut = _cut_substitutions_from(g, keep)
+
+    while ne(gcut) != 0
+        for i in 1:nv(gcut)
+            # only substitute if there are no dependencies
+            !iszero(indegree(gcut, i)) && continue
+
+            rule = eqs[i].lhs => eqs[i].rhs
+            for nb in copy(outneighbors(gcut, i))
+                eq = eqs[nb]
+                eqs[nb] = eq.lhs ~ substitute(eq.rhs, rule)
+                t = rem_edge!(gcut, i, nb)
+                @assert t "Could not remove edge. Weird."
+            end
+        end
+    end
+end
+
+"""
+    _cut_substitutions_from(g, vertices)
+
+Cut all connections from and to given vertices in Graph. Returns a new graph.
+"""
+function _cut_substitutions_from(g, vertices)
+    g = copy(g)
+    for v in vertices
+        for nb in copy(outneighbors(g, v))
+            rem_edge!(g, v, nb)
+        end
+    end
+    return g
+end
+
+function _dependency_graph(eqs)
+    g = SimpleDiGraph(length(eqs))
+    symbols = [eq.lhs for eq ∈ eqs]
+    for (i, eq) in enumerate(eqs)
+        rhs_vars = get_variables(eq.rhs)
+        for (isym, sym) in enumerate(symbols)
+            if Set([sym]) ⊆ Set(rhs_vars)
+                add_edge!(g, isym => i)
+            end
+        end
+    end
+    return g
+end
+
 # This code ist adapted from the Hawick & James implementation in Graphs.jl which is
 # licenced as follows: https://github.com/JuliaGraphs/Graphs.jl/blob/master/LICENSE.md
 # Copyright (c) 2015: Seth Bromberger and other contributors. Copyright (c) 2012: John Myles White and other contributors.

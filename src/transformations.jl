@@ -138,13 +138,13 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
 
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
-        reduced_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=true, trysolve=true, verbose)
+        reduced_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=false, trysolve=true, verbose)
     end
 
     # also substitute in the already removed_eqs
     removed_eqs = deepcopy(iob.removed_eqs)
     for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=true, trysolve=false, verbose)
+        removed_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=false, trysolve=false, verbose)
     end
 
     verbose && @info "Substituted algebraic states:" rules
@@ -174,59 +174,10 @@ function _algebraic_substitution_rules(eqs; skip=nothing)
     end
     algebraic_idx = findall(condition, eqs)
 
-    # symbols of all algebraic eqs
-    symbols = [eq.lhs for eq ∈ eqs[algebraic_idx]]
+    rules, keep = _uncouple_algebraic_equations(eqs[algebraic_idx])
+    removable = deleteat!(algebraic_idx, keep)
 
-    # generate dependency graph
-    g = SimpleDiGraph(length(algebraic_idx))
-    for (i, eq) in enumerate(eqs[algebraic_idx])
-        rhs_vars = get_variables(eq.rhs)
-        for (isym, sym) in enumerate(symbols)
-            if Set([sym]) ⊆ Set(rhs_vars)
-                add_edge!(g, isym => i)
-            end
-        end
-    end
-
-    unremovable = Int[] # node index
-    for set in cyclebreaking_vertices(g)
-        if length(set) == 1
-            push!(unremovable, only(set))
-        else
-            # TODO: add heuristik which equation to keep
-           push!(unremovable, last(set))
-        end
-    end
-    removable = setdiff(1:nv(g), unremovable)
-
-    # _cut_vertices!(g, unremovable)
-    # rules, indexed by node idx
-    # rules = Dict(idx => (eqs[algebraic_idx[idx]].lhs => eqs[algebraic_idx[idx]].rhs) for idx in removable)
-
-    # return (Dict(values(rules)), algebraic_idx[removable]) # return removable to eqs index
-    removable_eqs_idx = algebraic_idx[removable]
-    rules = Dict(eq.lhs => eq.rhs for eq in eqs[removable_eqs_idx])
-
-    # @info "r" rules removable_eqs_idx
-    return (rules, removable_eqs_idx) # return removable to eqs index
-end
-
-
-"""
-    _cut_vertices!(g, vertices)
-
-Cut all connections from and to given vertices in Graph.
-"""
-function _cut_vertices!(g, vertices)
-    for v in vertices
-        for nb in inneighbors(g)
-            rem_edge!(g, nb, v)
-        end
-        for nb in outeighbors(g)
-            rem_edge!(g, v, nb)
-        end
-    end
-    nothing
+    return (rules, removable)
 end
 
 
