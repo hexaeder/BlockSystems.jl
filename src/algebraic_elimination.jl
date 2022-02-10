@@ -1,5 +1,5 @@
 function _uncouple_algebraic_equations(eqs; verbose=true)
-    eqs = copy(eqs)
+    eqs = deepcopy(eqs)
     g = _dependency_graph(eqs)
 
     keep = Int[]
@@ -14,37 +14,11 @@ function _uncouple_algebraic_equations(eqs; verbose=true)
 
     _uncouple_algebraic_equations!(eqs, g, keep)
 
-    uncouple_again = false
-    for i in keep
-        (type, lhs_var) = eq_type(eqs[i])
-        if type === :explicit_algebraic
-            uncouple_again = true
-        elseif type === :implicit_algebraic
-            @assert !isnothing(lhs_var) "Why is it nothing? Should not happen!"
-            eq = eqs[i]
-            verbose && println("    Substitution resulted in implicit equation and was transformed!")
-            verbose && println("      ├ ", eq)
-            eq = 0 ~ simplify(eq.rhs - eq.lhs)
-            if lhs_var ∈ Set(get_variables(eq.rhs))
-                try
-                    eq = lhs_var ~ Symbolics.solve_for(eq, lhs_var)
-                    uncouple_again = true
-                catch e
-                    verbose && println("      ├ could not be resolved!")
-                    uncouple_again = false
-                end
-            end
-            verbose && println("      └ $eq")
-            eqs[i] = eq
-        end
-    end
-
     rules = Dict(eqs[i].lhs => eqs[i].rhs for i in eachindex(eqs) if i ∉ keep)
-    if uncouple_again
-        println("Not possible yet!")
-    end
+
     return (rules, keep)
 end
+
 
 function _uncouple_algebraic_equations!(eqs, g::SimpleDiGraph, keep::Vector{Int})
     gcut = _cut_substitutions_from(g, keep)

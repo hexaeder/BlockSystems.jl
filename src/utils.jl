@@ -114,6 +114,7 @@ remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
 remove_namespace(x::Term) = rename(x, remove_namespace(operation(x).name))
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
+substitute_rhs(eq::Equation, rules) = eq.lhs ~ substitute(eq.rhs, rules)
 
 uniquenames(syms) = allunique(getname.(syms))
 
@@ -175,6 +176,33 @@ end
 Returns the variable on the lhs of the equation for equations.
 """
 lhs_var(eq::Equation) = eq_type(eq)[2]
+
+
+"""
+    _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
+
+Transforms implicit algebraic equations with non-nohting lhs. If `trysolve` tries to solve them
+for lhs. Otherwis just transforms to `0 ~ rhs - lhs`.
+"""
+function _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
+    (type, lhs_var) = eq_type(eq)
+    if type === :implicit_algebraic && !isnothing(lhs_var)
+        verbose && println("    Substitution resulted in implicit equation and was transformed!")
+        verbose && println("      ├ ", eq)
+        eq = 0 ~ simplify(eq.rhs - eq.lhs)
+        if trysolve && lhs_var ∈ Set(get_variables(eq.rhs))
+            try
+                eq = lhs_var ~ Symbolics.solve_for(eq, lhs_var)
+            catch e
+                verbose && println("      ├ could not be resolved!")
+            end
+        end
+        verbose && println("      └ $eq")
+        return eq
+    else
+        return eq
+    end
+end
 
 
 """

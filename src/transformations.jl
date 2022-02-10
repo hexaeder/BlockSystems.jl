@@ -39,10 +39,10 @@ function connect_system(ios::IOSystem;
     # get rid of closed inputs by substituting output states
     substitutions = reverse.(ios.connections)
     for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+        eqs[i] = substitute_rhs(eq, substitutions)
     end
     for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+        removed_eqs[i] = substitute_rhs(eq, substitutions)
     end
     # keep connections around in removed states
     for con in ios.connections
@@ -138,13 +138,14 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
 
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
-        reduced_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=false, trysolve=true, verbose)
+        eq = substitute_rhs(eq, rules)
+        reduced_eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
 
     # also substitute in the already removed_eqs
     removed_eqs = deepcopy(iob.removed_eqs)
     for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=false, trysolve=false, verbose)
+        removed_eqs[i] = substitute_rhs(eq, rules)
     end
 
     verbose && @info "Substituted algebraic states:" rules
@@ -242,46 +243,17 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     rem_eqs = deepcopy(iob.removed_eqs)
 
     for (i, eq) in enumerate(eqs)
-        eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=true, trysolve=true, verbose)
+        eq = substitute_rhs(eq, rules)
+        eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
     for (i, eq) in enumerate(rem_eqs)
-        rem_eqs[i] = _substitute_handle_implicit_algebraic(eq, rules; recursive=true, trysolve=true, verbose)
+        eq = substitute_rhs(eq, rules)
+        rem_eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
 
     newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob), warn)
 
     return newblock
-end
-
-
-"""
-    _substitute_handle_implicit_algebraic(eq, rules; verbose=false)
-
-Substitute rhs of eq accoding to rules. If this results in an implicit alg eq
-try to solve for lhs (optionally).
-"""
-function _substitute_handle_implicit_algebraic(eq, rules; recursive, trysolve, verbose=false)
-    if recursive
-        neweqs = eq.lhs ~ recursive_substitute(eq.rhs, rules)
-    else
-        neweqs = eq.lhs ~ substitute(eq.rhs, rules)
-    end
-
-    new_type, lhs_var = eq_type(neweqs)
-    if new_type===:implicit_algebraic && !isnothing(lhs_var)
-        verbose && println("    Substitution resulted in implicit equation and was transformed!")
-        verbose && println("      ├ ", neweqs)
-        neweqs = 0 ~ simplify(neweqs.rhs - neweqs.lhs)
-        if trysolve && lhs_var ∈ Set(get_variables(neweqs.rhs))
-            try
-                neweqs = lhs_var ~ Symbolics.solve_for(neweqs, lhs_var)
-            catch e
-                verbose && println("      ├ could not be resolved!")
-            end
-        end
-        verbose && println("      └ $neweqs")
-    end
-    return neweqs
 end
 
 
