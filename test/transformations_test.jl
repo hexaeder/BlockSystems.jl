@@ -99,14 +99,14 @@ end
         reqs = substitute_algebraic_states(IOBlock(eqs,[],[x,y]))
         equations(reqs)
         @test equations(reqs) == [D(x) ~ i,
-                          D(y) ~ i,
-                          o1 ~ -x + -y]
-        @test reqs.removed_eqs == [o2 ~ y + 2*o1]
+                          D(y) ~ i,]
+        @test reqs.removed_eqs == [o2 ~ y + 2*(-x + -y),
+                                   o1 ~ -x + -y]
 
         # TODO: multiple applications should not remove more equations!
         rreqs = substitute_algebraic_states(reqs)
-        @test_broken equations(rreqs) == equations(reqs)
-        @test_broken rreqs.removed_eqs == reqs.removed_eqs
+        @test equations(rreqs) == equations(reqs)
+        @test rreqs.removed_eqs == reqs.removed_eqs
 
         # test skip condition
         eqs = [D(x) ~ i + o,

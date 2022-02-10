@@ -1,26 +1,64 @@
-function _uncouple_algebraic_equations(eqs; verbose=true)
+"""
+    _uncouple_algebraic_equations(eqs; verbose=false)
+
+Uncouple a given set of explicit algebraic equations. Returns a tuple
+
+    (rules, keep)
+
+of independent substitution rules (non recursive) and a list of indices
+of equations, which could not be reduced.
+"""
+function _uncouple_algebraic_equations(eqs; verbose=false)
+    @check all([eq_type(eq)[1] for eq in eqs] .== :explicit_algebraic) "Can only hanlde expl. alg. eqs!"
+
     eqs = deepcopy(eqs)
-    g = _dependency_graph(eqs)
+    g = _expl_algebraic_dependency_graph(eqs)
 
     keep = Int[]
     for set in cyclebreaking_vertices(g)
         if length(set) == 1
             push!(keep, only(set))
         else
-            # TODO: add heuristik which equation to keep
+            # TODO: cleverly pick which equations to keep
+            # there are several possible combinations of equations to keep which all break the
+            # circles. Maybe some are better then other given that we later try to solve the
+            # new implicit algebraic equations?
            push!(keep, last(set))
         end
     end
 
-    _uncouple_algebraic_equations!(eqs, g, keep)
-
+    _substitute_along_depgraph!(eqs, g, keep)
     rules = Dict(eqs[i].lhs => eqs[i].rhs for i in eachindex(eqs) if i ∉ keep)
+
+    # if the algorightm could not remove alle of the equations, there have been
+    verbose && !isempty(keep) && println("Try to handle the newly created implicit equations")
+    transformed = map!(eq->_transform_implicit_algebraic(eq; verbose), eqs[keep], eqs[keep])
+    explicit = findall(isequal(:explicit_algebraic), map(eq -> eq_type(eq)[1], transformed))
+    if !isempty(explicit)
+        verbose && println("This lead to new explicit algebraic equations! Recursivly uncouple")
+        subrules, subkeep = _uncouple_algebraic_equations(transformed[explicit]; verbose)
+        keep = keep[subkeep]
+
+        for (k, r) in rules
+            rules[k] = substitute(r, subrules)
+        end
+        merge!(rules, subrules)
+    end
 
     return (rules, keep)
 end
 
 
-function _uncouple_algebraic_equations!(eqs, g::SimpleDiGraph, keep::Vector{Int})
+"""
+    _substitute_along_depgraph!(eqs, g, keep)
+
+Remove all connections from from equations in `keep`. The remaining graph
+should be cycle free. Start with the outermost equations and substitute along
+the dependency graph.
+After this, the `eqs` object should only depend on `eqs[keep]` without any further
+interdependency between them!
+"""
+function _substitute_along_depgraph!(eqs, g::SimpleDiGraph, keep::Vector{Int})
     gcut = _cut_substitutions_from(g, keep)
 
     while ne(gcut) != 0
@@ -54,7 +92,13 @@ function _cut_substitutions_from(g, vertices)
     return g
 end
 
-function _dependency_graph(eqs)
+"""
+    _expl_algebraic_dependency_graph(eqs)
+
+Get the dependency graph for a given set of explicit algebraic equations.
+Edge 1->2 means, that state 1 appears in state 2.
+"""
+function _expl_algebraic_dependency_graph(eqs)
     g = SimpleDiGraph(length(eqs))
     symbols = [eq.lhs for eq ∈ eqs]
     for (i, eq) in enumerate(eqs)
