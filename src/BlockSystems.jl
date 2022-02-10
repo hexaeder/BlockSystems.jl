@@ -407,6 +407,7 @@ function create_namespace_promotions(syms, forbidden, autopromote)
     return dict
 end
 
+include("algebraic_elimination.jl")
 include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")

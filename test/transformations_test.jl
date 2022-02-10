@@ -13,8 +13,8 @@ end
 @info "Testes of transformations.jl"
 
 @testset "transformations.jl" begin
-    @testset "pairwise cycle free" begin
-        using BlockSystems: _pairwise_cycle_free
+    @testset "cyclebreaking vertices" begin
+        using BlockSystems: cyclebreaking_vertices
         g = SimpleDiGraph(5)
         add_edge!(g, 1=>2)
         add_edge!(g, 2=>4)
@@ -24,7 +24,7 @@ end
         add_edge!(g, 2=>3)
         add_edge!(g, 5=>4)
         cycles = simplecycles(g)
-        @test _pairwise_cycle_free(g) == [3,5]
+        @test cyclebreaking_vertices(g) == [[2,3,1], [5,4]]
     end
 
     @testset "remove superfluous states" begin

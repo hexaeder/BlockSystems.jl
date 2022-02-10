@@ -187,42 +187,46 @@ function _algebraic_substitution_rules(eqs; skip=nothing)
             end
         end
     end
-    removable = algebraic_idx[_pairwise_cycle_free(g)]
-    @assert allunique(removable)
 
-    rules = Dict(eq.lhs => eq.rhs for eq in eqs[removable])
-    return (rules, removable)
-end
-
-"""
-    _pairwise_cycle_free(g:SimpleDiGraph)
-
-Returns an array of vertices, which pairwise do not belong to any cycle in `g`.
-Uses `simplecycles` from `Graphs`. The algorithm starts with all vertices
-and iteratively removes the vertices is part of most cycles.
-"""
-function _pairwise_cycle_free(g::SimpleDiGraph)
-    idx = collect(vertices(g))
-    cycles = simplecycles(g)
-    while true
-        cycles_per_idx = zeros(Int, length(idx))
-        for (i, id1) ∈ enumerate(idx)
-            for (j, id2) ∈ enumerate(@view idx[i+1 : end])
-                for c in cycles
-                    if id1 ∈ c && id2 ∈ c
-                        cycles_per_idx[i] += 1
-                        cycles_per_idx[i+j] += 1
-                    end
-                end
-            end
-        end
-        if sum(cycles_per_idx) > 0
-            worst_idx = findmax(cycles_per_idx)[2]
-            deleteat!(idx, worst_idx)
+    unremovable = Int[] # node index
+    for set in cyclebreaking_vertices(g)
+        if length(set) == 1
+            push!(unremovable, only(set))
         else
-            return idx
+            # TODO: add heuristik which equation to keep
+           push!(unremovable, last(set))
         end
     end
+    removable = setdiff(1:nv(g), unremovable)
+
+    # _cut_vertices!(g, unremovable)
+    # rules, indexed by node idx
+    # rules = Dict(idx => (eqs[algebraic_idx[idx]].lhs => eqs[algebraic_idx[idx]].rhs) for idx in removable)
+
+    # return (Dict(values(rules)), algebraic_idx[removable]) # return removable to eqs index
+    removable_eqs_idx = algebraic_idx[removable]
+    rules = Dict(eq.lhs => eq.rhs for eq in eqs[removable_eqs_idx])
+
+    # @info "r" rules removable_eqs_idx
+    return (rules, removable_eqs_idx) # return removable to eqs index
+end
+
+
+"""
+    _cut_vertices!(g, vertices)
+
+Cut all connections from and to given vertices in Graph.
+"""
+function _cut_vertices!(g, vertices)
+    for v in vertices
+        for nb in inneighbors(g)
+            rem_edge!(g, nb, v)
+        end
+        for nb in outeighbors(g)
+            rem_edge!(g, v, nb)
+        end
+    end
+    nothing
 end
 
 
