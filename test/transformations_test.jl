@@ -380,4 +380,13 @@ end
         @test_throws ArgumentError blk2 = set_p(blk, :a=>:bla)
         @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
     end
+
+    @testset "simplify eqs" begin
+        @parameters t a
+        @variables x(t)
+        D = Differential(t)
+        blk = IOBlock([D(x) ~ x/a], [], [])
+
+        @test_broken ModelingToolkit.namespace_equations(simplify_eqs(blk).system)
+    end
 end
