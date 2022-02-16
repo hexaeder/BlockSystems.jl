@@ -1,4 +1,4 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs, set_input
 
 """
 $(SIGNATURES)
@@ -382,3 +382,25 @@ function set_p(blk::IOBlock, p::Dict; warn=true)
 end
 
 set_p(blk::IOBlock, p...; warn=true) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
+
+"""
+    set_input(blk::IOBlock, p::Pair; verbose=false)
+
+Close an input of blk. Given as an pair of (input=>substitution). The input may
+be given as an symbol (i.e. :a) or symbolic (i.e. blk.a). The substitution term
+can be either a numer or a term of parameters (which will become internal
+parameters).
+"""
+function set_input(blk::IOBlock, p::Pair; verbose=false)
+    sym, val = p
+    input = getproperty(blk, sym)
+    inputname = getname(remove_namespace(blk.name, input))
+    @check input ∈ Set(namespace_inputs(blk)) "Symbol $sym is no valid input!"
+    iv = get_iv(blk)
+    tmp, = @variables $inputname(iv)
+    tmpblk = IOBlock([tmp ~ val], [], [tmp])
+    sys = IOSystem([getproperty(tmpblk, inputname) => getproperty(blk, inputname)],
+                    [tmpblk, blk];
+                   outputs=namespace_outputs(blk), name=blk.name)
+    return connect_system(sys; verbose)
+end

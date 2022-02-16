@@ -9,6 +9,7 @@ using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespa
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
 using ModelingToolkit.Symbolics: tosymbol
+using SciMLBase
 using Graphs
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations

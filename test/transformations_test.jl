@@ -393,4 +393,28 @@ end
 
         @test_broken ModelingToolkit.namespace_equations(simplify_eqs(blk).system)
     end
+
+    @testset "set input" begin
+        @variables t o(t)
+        @parameters i(t)
+        blk = IOBlock([o ~ 2*i], [i], [o])
+
+        blk2 = set_input(blk, :i=>4)
+        @test equations(blk2) == [o ~ 8]
+        blk2 = set_input(blk, i=>4)
+        @test equations(blk2) == [o ~ 8]
+        blk2 = set_input(blk, blk.i=>4)
+        @test equations(blk2) == [o ~ 8]
+
+        @test blk.name == blk2.name
+        @test blk2.removed_eqs == [i~4]
+
+        @parameters a(t)
+        blk2 = set_input(blk, :i=>a)
+        @test equations(blk2) == [o ~ 2a]
+        blk2 = set_input(blk, i=>a)
+        @test equations(blk2) == [o ~ 2a]
+        blk2 = set_input(blk, blk.i=>a)
+        @test equations(blk2) == [o ~ 2a]
+    end
 end
