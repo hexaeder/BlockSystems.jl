@@ -102,6 +102,12 @@ struct IOBlock <: AbstractIOSystem
             end
         end
 
+        try
+            namespace_equations(odes)
+        catch e
+            @warn "It seems like one of the transformations droped metadata. Please report issue!"
+        end
+
         # TODO: check IOBlock assumptions in inner constructor
         # - each state is represented by one lhs (static or diff) or implicit algebraic equation?
         # - lhs only first order or algebraic
