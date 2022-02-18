@@ -38,12 +38,16 @@ function connect_system(ios::IOSystem;
 
     # get rid of closed inputs by substituting output states
     substitutions = reverse.(ios.connections)
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = substitute_rhs(eq, substitutions)
+    substitute_all_rhs!(eqs, substitutions)
+    substitute_all_rhs!(removed_eqs, substitutions)
+
+    # connections of type a + b => might introduce terms inside differentials, needs expansion
+    diffs = rhs_differentials(eqs)
+    if !isempty(diffs)
+        diff_expansion_rules = Dict(diffs .=> expand_derivatives.(diffs))
+        substitute_all_rhs!(eqs, diff_expansion_rules)
     end
-    for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = substitute_rhs(eq, substitutions)
-    end
+
     # keep connections around in removed states
     for con in ios.connections
         push!(removed_eqs, con.second ~ con.first)
@@ -214,7 +218,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     algebraic_subs = Dict{Symbolic, Any}()
     function lazy_alg_subs()
         if isempty(algebraic_subs)
-            verbose && println("Lazily initialized algebraic substitutions for substitution of derivatives!")
+            verbose && println("      ...lazily initialized algebraic substitutions.")
             merge!(algebraic_subs, _algebraic_substitution_rules(eqs)[1])
         end
         return algebraic_subs
@@ -227,7 +231,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
             rules[diff] = known_differentials[diff]
             verbose && println("    ", diff, " => ", rules[diff])
         else
-            substituted = recursive_substitute(diff, lazy_alg_subs())
+            substituted = substitute(diff, lazy_alg_subs())
             expanded = expand_derivatives(substituted)
             sub_known = substitute(expanded, known_differentials)
 

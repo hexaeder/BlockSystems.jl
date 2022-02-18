@@ -115,6 +115,11 @@ remove_namespace(x::Term) = rename(x, remove_namespace(operation(x).name))
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 substitute_rhs(eq::Equation, rules) = eq.lhs ~ substitute(eq.rhs, rules)
+function substitute_all_rhs!(eqs::Vector{Equation}, substitutions)
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = substitute_rhs(eq, substitutions)
+    end
+end
 
 uniquenames(syms) = allunique(getname.(syms))
 
@@ -224,9 +229,10 @@ end
 
 Return Set of all differentials which are present in the rhs of the system.
 """
-function rhs_differentials(iob)
+rhs_differentials(iob) = rhs_differentials(equations(iob))
+function rhs_differentials(eqs::Vector{Equation})
     diffs = Set{SymbolicUtils.Symbolic}()
-    for eq in equations(iob)
+    for eq in eqs
         _collect_differentials!(diffs, eq.rhs)
     end
     return diffs

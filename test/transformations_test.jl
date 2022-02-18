@@ -343,6 +343,21 @@ end
         @test equations(blk2) == [D(x) ~ 1 + 5*x + b,
                                   y ~ 2 + z,
                                   D(z) ~ 5*x + b]
+
+        @parameters i(t)
+        @variables o(t)
+        @named b1 = IOBlock([o ~ sin(t)], [], [o])
+        @named b2 = IOBlock([o ~ cos(t)], [], [o])
+        @named b3 = IOBlock([o ~ D(i)], [i], [o])
+        c = IOSystem([b1.o => b3.i],
+                     [b1, b2, b3], outputs=[b3.o]) |> connect_system
+        @test equations(c) == [b3.o ~ cos(t)]
+        c = IOSystem([b1.o + b2.o => b3.i],
+                     [b1, b2, b3], outputs=[b3.o]) |> connect_system
+        @test equations(c) == [b3.o ~ cos(t) - sin(t)]
+        c = IOSystem([b1.o * b2.o => b3.i],
+                     [b1, b2, b3], outputs=[b3.o]) |> connect_system
+        @test equations(c) == [b3.o ~ (cos(t))^2 - (sin(t))^2]
     end
 
     @testset "Don't remove implicit differential equations" begin
