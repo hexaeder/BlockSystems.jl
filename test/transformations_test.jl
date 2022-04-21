@@ -419,6 +419,11 @@ end
 
         # this errors on MTK@0.8 currently
         ModelingToolkit.namespace_equations(simplify_eqs(blk).system)
+
+        @variables a(t) b(t) c(t) d(t)
+        term = substitute(a - b, b=>c + d) |> Symbolics.unwrap
+        terms = simplify(term)
+        @test_broken !any(Symbolics.metadata.(Symbolics.get_variables(terms)).==nothing)
     end
 
     @testset "set input" begin

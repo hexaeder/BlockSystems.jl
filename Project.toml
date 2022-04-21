@@ -10,12 +10,14 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
 DocStringExtensions = "0.7, 0.8"
 Graphs = "1.4"
 ModelingToolkit = "7"
 SymbolicUtils = "0.18, 0.19"
+Symbolics = "~4.3"
 julia = "1.6"
 
 [extras]

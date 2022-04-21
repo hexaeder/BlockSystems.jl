@@ -272,21 +272,23 @@ end
 
 Simplify eqs and removed eqs and return new IOBlock.
 """
-function simplify_eqs(iob::IOBlock; verbose=false, warn=true)
+function simplify_eqs(iob::IOBlock; verbose=false, warn=true, hotfix=true)
     verbose && @info "Simplify iob equations..."
     simplified_eqs = simplify.(equations(iob))
     simplified_rem_eqs = simplify.(iob.removed_eqs)
 
     # TODO: temporary fix until the metadata issues are solved in MetaTheory
-    missing_metadata1 = check_metadata(simplified_eqs)
-    if !isempty(missing_metadata1)
-        warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
-        simplified_eqs = equations(iob)
-    end
-    missing_metadata2 = check_metadata(simplified_rem_eqs)
-    if !isempty(missing_metadata2)
-        warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
-        simplified_rem_eqs = iob.removed_eqs
+    if hotfix
+        missing_metadata1 = check_metadata(simplified_eqs)
+        if !isempty(missing_metadata1)
+            warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
+            simplified_eqs = equations(iob)
+        end
+        missing_metadata2 = check_metadata(simplified_rem_eqs)
+        if !isempty(missing_metadata2)
+            warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
+            simplified_rem_eqs = iob.removed_eqs
+        end
     end
 
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
