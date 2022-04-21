@@ -187,7 +187,7 @@ lhs_var(eq::Equation) = eq_type(eq)[2]
     _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
 
 Transforms implicit algebraic equations with non-nohting lhs. If `trysolve` tries to solve them
-for lhs. Otherwis just transforms to `0 ~ rhs - lhs`.
+for lhs. Otherwise just transforms to `0 ~ rhs - lhs`.
 """
 function _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
     (type, lhs_var) = eq_type(eq)
@@ -251,4 +251,23 @@ function _collect_differentials!(found, ex)
         end
     end
     return found
+end
+
+function check_metadata(exprs)
+    nometadata = []
+    for ex in exprs
+        if ex isa Equation
+            _check_metadata!(nometadata, ex.rhs)
+            _check_metadata!(nometadata, ex.lhs)
+        else
+            _check_metadata!(nometadata, ex)
+        end
+    end
+    return unique!(nometadata)
+end
+function _check_metadata!(nometadata, expr)
+    vars = Symbolics.get_variables(expr)
+    for v in vars
+        isnothing(Symbolics.metadata(v)) && push!(nometadata, v)
+    end
 end

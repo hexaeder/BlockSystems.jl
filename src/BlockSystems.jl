@@ -110,10 +110,13 @@ struct IOBlock <: AbstractIOSystem
             end
         end
 
-        try
-            namespace_equations(odes)
-        catch e
-            @warn "It seems like one of the transformations droped metadata. Please report issue!"
+        nometadata = check_metadata(equations(odes))
+        if !isempty(nometadata)
+            @warn "Transformation for $name dropped metadata in equations. Please report issue! Syms without data: $nometadata"
+        end
+        nometadata = check_metadata(rem_eqs)
+        if !isempty(nometadata)
+            @warn "Transformation for $name dropped metadata in removed equations. Please report issue! Syms without data: $nometadata"
         end
 
         # TODO: check IOBlock assumptions in inner constructor

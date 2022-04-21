@@ -28,7 +28,13 @@ function connect_system(ios::IOSystem;
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
-            ios.systems[i] = connect_system(subsys, verbose=verbose)
+            ios.systems[i] = connect_system(subsys;
+                                            verbose,
+                                            simplify_eqs,
+                                            remove_superflous_states,
+                                            substitute_algebraic_states,
+                                            substitute_derivatives,
+                                            warn)
         end
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
@@ -270,6 +276,19 @@ function simplify_eqs(iob::IOBlock; verbose=false, warn=true)
     verbose && @info "Simplify iob equations..."
     simplified_eqs = simplify.(equations(iob))
     simplified_rem_eqs = simplify.(iob.removed_eqs)
+
+    # TODO: temporary fix until the metadata issues are solved in MetaTheory
+    missing_metadata1 = check_metadata(simplified_eqs)
+    if !isempty(missing_metadata1)
+        warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
+        simplified_eqs = equations(iob)
+    end
+    missing_metadata2 = check_metadata(simplified_rem_eqs)
+    if !isempty(missing_metadata2)
+        warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
+        simplified_rem_eqs = iob.removed_eqs
+    end
+
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
