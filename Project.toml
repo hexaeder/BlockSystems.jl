@@ -16,7 +16,7 @@ DocStringExtensions = "0.7, 0.8"
 Graphs = "1.4"
 ModelingToolkit = "7"
 SymbolicUtils = "0.18, 0.19"
-Symbolics = "~4.3"
+Symbolics = "~4.3, 4"
 julia = "1.6"
 
 [extras]
