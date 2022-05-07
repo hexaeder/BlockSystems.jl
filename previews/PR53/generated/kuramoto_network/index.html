@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Kuramoto Network · BlockSystems.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link rel="canonical" href="https://hexaeder.github.io/BlockSystems.jl/generated/kuramoto_network/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">BlockSystems.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../spacecraft/">Spacecraft</a></li><li class="is-active"><a class="tocitem" href>Kuramoto Network</a><ul class="internal"><li><a class="tocitem" href="#Integration-with-NetworkDynamics.jl"><span>Integration with <code>NetworkDynamics.jl</code></span></a></li></ul></li><li><a class="tocitem" href="../kuramoto_without_nd/">Kuramoto without ND.jl</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Kuramoto Network</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Kuramoto Network</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/hexaeder/BlockSystems.jl/blob/main/examples/kuramoto_network.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="Integration-with-NetworkDynamics.jl"><a class="docs-heading-anchor" href="#Integration-with-NetworkDynamics.jl">Integration with <code>NetworkDynamics.jl</code></a><a id="Integration-with-NetworkDynamics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Integration-with-NetworkDynamics.jl" title="Permalink"></a></h2><p>In this example we model a Network based on the <a href="https://en.wikipedia.org/wiki/Kuramoto_model">Kuramoto model</a> using the <a href="https://github.com/FHell/NetworkDynamics.jl"><code>NetworkDynamics.jl</code></a> package.</p><pre><code class="language-julia hljs">using NetworkDynamics
+using Graphs
+using BlockSystems
+using ModelingToolkit
+using OrdinaryDiffEq
+using Plots</code></pre><p>In the Kuramoto model each vertex <span>$i$</span> has it&#39;s own intrinsic angular frequency <span>$\omega_i$</span>. The angle of frequency is given by</p><p class="math-container">\[\dot\phi = \omega_i + \sum e\]</p><p>where <span>$\sum e$</span> sums over all the connected edges.</p><pre><code class="language- hljs">@parameters t ω edgesum(t)
+@variables ϕ(t)
+D = Differential(t)
+
+kmvert = IOBlock([D(ϕ) ~ ω + edgesum],
+                 [edgesum],
+                 [ϕ],
+                 name=:kmvert)
+
+function generate_ode_vertex(iob::IOBlock, aggregator; kwargs...)
+    gen = generate_io_function(iob; kwargs...)
+    f = (du, u, edges, p, t) -&gt; gen.f_ip(du, u, aggregator(edges), p, t)
+    vars = ModelingToolkit.tosymbol.(gen.states)
+    ODEVertex(f = f, dim = length(vars), sym = vars)
+end
+
+# allocation free oop aggregator. might be more difficult for more-dimensional systems
+# unfortunately there are no vector variables in MDK and we can&#39;t model the aggregators
+# as an IOSystem.
+function sumedges(edges)
+    r = 0.0
+    for e in edges
+        r += e[1]
+    end
+    return r
+end
+
+vertex = generate_ode_vertex(kmvert, sumedges)
+nothing #hide</code></pre><p>The edges are defined as</p><p class="math-container">\[e_{i,j} = K \cdot \mathrm{sin}(\phi_i - \phi_j)\]</p><p>For the (static) edges we can&#39;t used IOSystem function building in the moment. Well, we could but than we&#39;d get an <code>ODEEdge</code> with zero-massmatrix.</p><pre><code class="language- hljs">@parameters v₁(t) v₂(t) K
+edge_ip = build_function([K*sin(v₁[1] - v₂[1])], [v₁], [v₂], K, t, expression=Val{false})[2]
+edge = StaticEdge(f = edge_ip, dim = 1, coupling=:antisymmetric)
+
+nothing #hide</code></pre><p>Lets runt the <a href="https://fhell.github.io/NetworkDynamics.jl/dev/heterogeneous_system/#Heterogenous-parameters">same example</a> as in <code>NetworkDynamics.jl</code></p><pre><code class="language- hljs">N = 8
+g = watts_strogatz(N,2,0) # ring network
+nd = network_dynamics(vertex, edge, g)
+
+ω = collect(1:N)./N
+ω .-= sum(ω)/N
+K = 3.
+p = (ω, K); # p[1] vertex parameters, p[2] edge parameters
+
+x0 = collect(1:N)./N
+x0 .-= sum(x0)./N
+
+
+tspan = (0., 10.)
+prob = ODEProblem(nd, x0, tspan, p)
+sol = solve(prob, Tsit5())
+plot(sol, ylabel=&quot;ϕ&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spacecraft/">« Spacecraft</a><a class="docs-footer-nextpage" href="../kuramoto_without_nd/">Kuramoto without ND.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.16 on <span class="colophon-date" title="Saturday 7 May 2022 02:02">Saturday 7 May 2022</span>. Using Julia version 1.7.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
