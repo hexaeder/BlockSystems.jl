@@ -281,8 +281,8 @@ function IOSystem(cons,
     namespace_map = merge(namespace_map, auto_promotions)
 
     # assert that there are no namespace clashes. this should be allways true!
-    @assert uniquenames(keys(namespace_map)) "ERROR: complete namespace map lhs not unique"
-    @assert uniquenames(values(namespace_map)) "ERROR: complete namespace map lhs not unique"
+    @assert uniquenames(keys(namespace_map)) "ERROR: complete namespace map lhs not unique: $namespace_map"
+    @assert uniquenames(values(namespace_map)) "ERROR: complete namespace map rhs not unique: $namespace_map"
 
     nmspc_promote = ModelingToolkit.substituter(namespace_map)
     inputs  = nmspc_promote.(open_inputs)
@@ -379,23 +379,41 @@ fix_map_types(::Nothing) = Dict()
 """
     create_namepsace_promotions(syms, forbidden, autopromote)
 
-Takes two lists of Symbols, `syms` and `forbidden`. Returns a Dict of namespace
+Takes two lists of Symbolics.Syms, `syms` and `forbidden`. Returns a Dict of namespace
 promotions for each symbol in `syms`. Avoids name collisions inside the list as well
 as with the `forbidden` symbols.
 """
 function create_namespace_promotions(syms, forbidden, autopromote)
     dict = Dict()
     if autopromote
-        promoted = remove_namespace.(syms)
-        for i in 1:length(syms)
-            forbidden_names = getname.(forbidden) ∪ getname.(promoted[[1:i-1;i+1:end]])
-            dict[syms[i]] = getname(promoted[i])∈forbidden_names ? syms[i] : promoted[i]
+        # try to promote every variable unless this leads to forbidden variable
+        for k in syms
+            candidate = remove_namespace(k)
+            if getname(candidate) ∈ getname.(forbidden)
+                dict[k] = k
+            else
+                dict[k] = candidate
+            end
+        end
+
+        # repeatedly unpromote everything which leads to duplicates
+        while true
+            dups = duplicates(getname.(values(dict)))
+            isempty(dups) && break
+            for (k, v) in dict
+                if getname.(v) ∈ dups
+                    dict[k] = k # unpromote k
+                end
+            end
         end
     else
-        for i in 1:length(syms)
-            dict[syms[i]] = syms[i]
+        # no autopromote means k => k
+        for k in syms
+            dict[k] = k
         end
     end
+
+    @assert uniquenames(values(dict)) "Namespace promotion lead to errors. Please report bug and try `autopromote=false` as workaround."
     return dict
 end
 

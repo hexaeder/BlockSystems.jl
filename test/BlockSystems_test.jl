@@ -80,7 +80,11 @@ using Graphs
 
         prom = create_namespace_promotions([Aa, Ba, Ab, Bc, Ax, Bx, Ay, Bz], [b, y], false)
         @test Set(values(prom)) == Set([Aa, Ba, Ab, Bc, Ax, Bx, Ay, Bz])
-    end
+
+        ABa, Ba, a = value.(@parameters A₊B₊a B₊a(t) a)
+        prom = create_namespace_promotions([ABa, Ba, a], [], true)
+        @test Set(values(prom)) == Set([ABa, Ba, a])
+ end
 
     @testset "IOBlock from other IOBlock" begin
         @parameters t i1(t) i2(t) a b
