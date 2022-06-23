@@ -1,4 +1,4 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs, set_input
 
 """
 $(SIGNATURES)
@@ -28,7 +28,13 @@ function connect_system(ios::IOSystem;
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
-            ios.systems[i] = connect_system(subsys, verbose=verbose)
+            ios.systems[i] = connect_system(subsys;
+                                            verbose,
+                                            simplify_eqs,
+                                            remove_superflous_states,
+                                            substitute_algebraic_states,
+                                            substitute_derivatives,
+                                            warn)
         end
     end
     eqs = vcat([namespace_equations(iob.system) for iob in ios.systems]...)
@@ -38,11 +44,19 @@ function connect_system(ios::IOSystem;
 
     # get rid of closed inputs by substituting output states
     substitutions = reverse.(ios.connections)
-    for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+    substitute_all_rhs!(eqs, substitutions)
+    substitute_all_rhs!(removed_eqs, substitutions)
+
+    # connections of type a + b => might introduce terms inside differentials, needs expansion
+    diffs = rhs_differentials(eqs)
+    if !isempty(diffs)
+        diff_expansion_rules = Dict(diffs .=> expand_derivatives.(diffs))
+        substitute_all_rhs!(eqs, diff_expansion_rules)
     end
-    for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = eq.lhs ~ substitute(eq.rhs, substitutions)
+
+    # keep connections around in removed states
+    for con in ios.connections
+        push!(removed_eqs, con.second ~ con.first)
     end
 
     verbose && @info "substitute inputs with outputs" eqs
@@ -58,12 +72,12 @@ function connect_system(ios::IOSystem;
         block = BlockSystems.remove_superflous_states(block; verbose, warn)
     end
 
-    if substitute_algebraic_states
-        block = BlockSystems.substitute_algebraic_states(block; verbose, warn)
-    end
-
     if substitute_derivatives
         block = BlockSystems.substitute_derivatives(block; verbose, warn)
+    end
+
+    if substitute_algebraic_states
+        block = BlockSystems.substitute_algebraic_states(block; verbose, warn)
     end
 
     if simplify_eqs
@@ -134,27 +148,14 @@ function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
 
     # subsitute all the equations, remove substituted
     for (i, eq) in enumerate(reduced_eqs)
-        neweqs = eq.lhs ~ recursive_substitute(eq.rhs, rules)
-        type, lhs_var = eq_type(neweqs)
-        if type == :implicit_algebraic && !isnothing(lhs_var)
-            verbose && print("Algebraic substitution resulted in implicit equation...")
-            # TODO: solve_for implicit algebraic equations
-            # try
-            #     neweqs = lhs_var ~ Symbolics.solve_for(neweqs, lhs_var)
-            #     verbose && println("which could be solved: $neweqs")
-            # catch e
-            #   e isa AssertionError || rethrow(e)
-                neweqs = 0 ~ neweqs.rhs - neweqs.lhs
-                verbose && println("which was transformed to `0 ~ f(...)` form: $neweqs")
-            # end
-        end
-        reduced_eqs[i] = neweqs
+        eq = substitute_rhs(eq, rules)
+        reduced_eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
 
     # also substitute in the already removed_eqs
     removed_eqs = deepcopy(iob.removed_eqs)
     for (i, eq) in enumerate(removed_eqs)
-        removed_eqs[i] = eq.lhs ~ recursive_substitute(eq.rhs, rules)
+        removed_eqs[i] = substitute_rhs(eq, rules)
     end
 
     verbose && @info "Substituted algebraic states:" rules
@@ -184,55 +185,10 @@ function _algebraic_substitution_rules(eqs; skip=nothing)
     end
     algebraic_idx = findall(condition, eqs)
 
-    # symbols of all algebraic eqs
-    symbols = [eq.lhs for eq ∈ eqs[algebraic_idx]]
+    rules, keep = _uncouple_algebraic_equations(eqs[algebraic_idx])
+    removable = deleteat!(algebraic_idx, keep)
 
-    # generate dependency graph
-    g = SimpleDiGraph(length(algebraic_idx))
-    for (i, eq) in enumerate(eqs[algebraic_idx])
-        rhs_vars = get_variables(eq.rhs)
-        for (isym, sym) in enumerate(symbols)
-            if Set([sym]) ⊆ Set(rhs_vars)
-                add_edge!(g, isym => i)
-            end
-        end
-    end
-    removable = algebraic_idx[_pairwise_cycle_free(g)]
-    @assert allunique(removable)
-
-    rules = Dict(eq.lhs => eq.rhs for eq in eqs[removable])
     return (rules, removable)
-end
-
-"""
-    _pairwise_cycle_free(g:SimpleDiGraph)
-
-Returns an array of vertices, which pairwise do not belong to any cycle in `g`.
-Uses `simplecycles` from `Graphs`. The algorithm starts with all vertices
-and iteratively removes the vertices is part of most cycles.
-"""
-function _pairwise_cycle_free(g::SimpleDiGraph)
-    idx = collect(vertices(g))
-    cycles = simplecycles(g)
-    while true
-        cycles_per_idx = zeros(Int, length(idx))
-        for (i, id1) ∈ enumerate(idx)
-            for (j, id2) ∈ enumerate(@view idx[i+1 : end])
-                for c in cycles
-                    if id1 ∈ c && id2 ∈ c
-                        cycles_per_idx[i] += 1
-                        cycles_per_idx[i+j] += 1
-                    end
-                end
-            end
-        end
-        if sum(cycles_per_idx) > 0
-            worst_idx = findmax(cycles_per_idx)[2]
-            deleteat!(idx, worst_idx)
-        else
-            return idx
-        end
-    end
 end
 
 
@@ -268,7 +224,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     algebraic_subs = Dict{Symbolic, Any}()
     function lazy_alg_subs()
         if isempty(algebraic_subs)
-            verbose && println("Lazily initialized algebraic substitutions for substitution of derivatives!")
+            verbose && println("      ...lazily initialized algebraic substitutions.")
             merge!(algebraic_subs, _algebraic_substitution_rules(eqs)[1])
         end
         return algebraic_subs
@@ -281,7 +237,7 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
             rules[diff] = known_differentials[diff]
             verbose && println("    ", diff, " => ", rules[diff])
         else
-            substituted = recursive_substitute(diff, lazy_alg_subs())
+            substituted = substitute(diff, lazy_alg_subs())
             expanded = expand_derivatives(substituted)
             sub_known = substitute(expanded, known_differentials)
 
@@ -297,10 +253,12 @@ function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
     rem_eqs = deepcopy(iob.removed_eqs)
 
     for (i, eq) in enumerate(eqs)
-        eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+        eq = substitute_rhs(eq, rules)
+        eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
     for (i, eq) in enumerate(rem_eqs)
-        rem_eqs[i] = eq.lhs ~ substitute(eq.rhs, rules)
+        eq = substitute_rhs(eq, rules)
+        rem_eqs[i] = _transform_implicit_algebraic(eq; trysolve=true, verbose)
     end
 
     newblock = IOBlock(iob.name, eqs, iob.inputs, iob.outputs, rem_eqs; iv=get_iv(iob), warn)
@@ -314,10 +272,25 @@ end
 
 Simplify eqs and removed eqs and return new IOBlock.
 """
-function simplify_eqs(iob::IOBlock; verbose=false, warn=true)
+function simplify_eqs(iob::IOBlock; verbose=false, warn=true, hotfix=true)
     verbose && @info "Simplify iob equations..."
     simplified_eqs = simplify.(equations(iob))
     simplified_rem_eqs = simplify.(iob.removed_eqs)
+
+    # TODO: temporary fix until the metadata issues are solved in MetaTheory
+    if hotfix
+        missing_metadata1 = check_metadata(simplified_eqs)
+        if !isempty(missing_metadata1)
+            warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
+            simplified_eqs = equations(iob)
+        end
+        missing_metadata2 = check_metadata(simplified_rem_eqs)
+        if !isempty(missing_metadata2)
+            warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
+            simplified_rem_eqs = iob.removed_eqs
+        end
+    end
+
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
@@ -365,14 +338,11 @@ function set_p(blk::IOBlock, p::Dict; warn=true)
     subs = Dict{Symbolic, Float64}()
     validp = Set(blk.iparams)
     for k in keys(p)
-        if k isa Symbol
+        try
             sym = getproperty(blk, k)
-        elseif k isa Num
-            sym = value(k)
-        elseif k isa Symbolic
-            sym = k
-        else
-            error("Can't use $k, wrong type $(typeof(k))")
+        catch
+            warn && @warn "Symbol $k not present in block. Skipped."
+            continue
         end
         sym = remove_namespace(blk.name, sym)
         @check sym ∈ validp "Symbol $sym is not iparam of block"
@@ -385,3 +355,25 @@ function set_p(blk::IOBlock, p::Dict; warn=true)
 end
 
 set_p(blk::IOBlock, p...; warn=true) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
+
+"""
+    set_input(blk::IOBlock, p::Pair; verbose=false)
+
+Close an input of blk. Given as an pair of (input=>substitution). The input may
+be given as an symbol (i.e. :a) or symbolic (i.e. blk.a). The substitution term
+can be either a numer or a term of parameters (which will become internal
+parameters).
+"""
+function set_input(blk::IOBlock, p::Pair; verbose=false)
+    sym, val = p
+    input = getproperty(blk, sym)
+    inputname = getname(remove_namespace(blk.name, input))
+    @check input ∈ Set(namespace_inputs(blk)) "Symbol $sym is no valid input!"
+    iv = get_iv(blk)
+    tmp, = @variables $inputname(iv)
+    tmpblk = IOBlock([tmp ~ val], [], [tmp])
+    sys = IOSystem([getproperty(tmpblk, inputname) => getproperty(blk, inputname)],
+                    [tmpblk, blk];
+                   outputs=namespace_outputs(blk), name=blk.name)
+    return connect_system(sys; verbose)
+end

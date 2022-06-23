@@ -9,6 +9,7 @@ using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespa
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
 using ModelingToolkit.Symbolics: tosymbol
+using SciMLBase
 using Graphs
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
@@ -36,6 +37,13 @@ function Base.getproperty(sys::AbstractIOSystem, name::Symbol)
     end
     throw(error("Variable $name does not exist"))
 end
+
+function Base.getproperty(sys::AbstractIOSystem, sym::Symbolic)
+    sym = remove_namespace(sys.name, sym)
+    getproperty(sys, getname(sym))
+end
+
+Base.getproperty(sys::AbstractIOSystem, num::Num) = getproperty(sys, value(num))
 
 function namespace_property(ios::AbstractIOSystem, prop::Symbol)
     [rename(sym, renamespace(ios.name, getname(sym)))
@@ -102,10 +110,13 @@ struct IOBlock <: AbstractIOSystem
             end
         end
 
-        try
-            namespace_equations(odes)
-        catch e
-            @warn "It seems like one of the transformations droped metadata. Please report issue!"
+        nometadata = check_metadata(equations(odes))
+        if !isempty(nometadata)
+            @warn "Transformation for $name dropped metadata in equations. Please report issue! Syms without data: $nometadata"
+        end
+        nometadata = check_metadata(rem_eqs)
+        if !isempty(nometadata)
+            @warn "Transformation for $name dropped metadata in removed equations. Please report issue! Syms without data: $nometadata"
         end
 
         # TODO: check IOBlock assumptions in inner constructor
@@ -417,6 +428,7 @@ function create_namespace_promotions(syms, forbidden, autopromote)
     return dict
 end
 
+include("algebraic_elimination.jl")
 include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")

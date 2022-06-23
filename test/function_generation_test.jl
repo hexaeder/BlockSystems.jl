@@ -4,6 +4,9 @@ using ModelingToolkit
 using ModelingToolkit: get_iv, get_eqs, get_states
 using LinearAlgebra
 using ModelingToolkit.Symbolics
+using SciMLBase
+using LinearAlgebra
+using OrdinaryDiffEq
 
 @info "Testes of function_generation.jl"
 
@@ -186,5 +189,26 @@ using ModelingToolkit.Symbolics
         @test allequal(gen.params, strip_iv([a, b], t))
         gen = generate_io_function(iob, f_params=[:b, a], warn=false)
         @test allequal(gen.params, strip_iv([b, a], t))
+    end
+
+    @testset "ODEFunction building" begin
+        @parameters t
+        @variables γ(t) ω(t) internal(t)
+        D = Differential(t)
+
+        iob = IOBlock([D(γ) ~ ω,
+                       D(ω) ~ -sin(γ),
+                       internal ~ γ + ω],
+                      [],
+                      [γ, ω])
+        iob = substitute_algebraic_states(iob)
+
+        equations(iob)
+        iob.removed_eqs
+
+        odef = ODEFunction(iob)
+        prob = ODEProblem(odef, [0.1,0], (0, 20))
+        sol = solve(prob, Tsit5())
+        @test all(sol[:γ] .+ sol[:ω] .== sol[:internal])
     end
 end

@@ -64,24 +64,25 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     if warn
         incomplete = false
         warnstr = ""
-        if length(f_states) != length(states)
+        if length(states)>1 && length(f_states) != length(states)
             incomplete = true
             warnstr *= "f_states, "
         end
-        if length(f_inputs) != length(inputs)
+        if length(inputs)>1 && length(f_inputs) != length(inputs)
             incomplete = true
             warnstr *= "f_inputs, "
         end
-        if length(f_params) != length(params)
+        if length(params)>1 && length(f_params) != length(params)
             incomplete = true
             warnstr *= "f_params, "
         end
-        if length(f_rem_states) != length(rem_states)
-            incomplete = true
-            warnstr *= "f_rem_states"
-        end
+        # don't warn for missing removed states ordering
+        # if length(rem_states)>1 && length(f_rem_states) != length(rem_states)
+        #     incomplete = true
+        #     warnstr *= "f_rem_states, "
+        # end
         if incomplete
-            @warn "The ordering of the states might change in future versions. Therefore it is highly recommend to provide all variables in the f_* arguments. There are missing entrys in" * warnstr[begin:end-2] * " are missing some entrys!"
+            @warn "The ordering of the states might change in future versions. Therefore it is highly recommend to provide all variables in the f_* arguments. There are missing entrys in " * warnstr[begin:end-2] * " are missing some entrys!"
         end
     end
 
@@ -146,6 +147,22 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
             params=param_syms,
             g_oop=g_oop, g_ip=g_ip,
             rem_states=rem_state_syms)
+end
+
+"""
+    ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false)
+
+Return an `ODEFunction` object with the corresponding mass matrix and variable names.
+"""
+function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=true)
+    @check isempty(iob.inputs) "all inputs must be closed"
+    gen = generate_io_function(iob; f_states, f_params, verbose, warn);
+    observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
+    ODEFunction((du,u,p,t) -> gen.f_ip(du,u,nothing,p,t);
+                mass_matrix = gen.massm,
+                syms=Symbol.(gen.states),
+                indepsym=get_iv(iob),
+                observed)
 end
 
 """

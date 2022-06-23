@@ -19,6 +19,49 @@ using Graphs
         @test Set(BlockSystems.namespace_iparams(iob)) == Set([iob.a])
     end
 
+    @testset "getproperty of symbol, num and symbolic" begin
+        @parameters t i1(t) i2(t) a
+        @variables x1(t) x2(t) o1(t) o2(t)
+        D = Differential(t)
+        eqs  = [D(x1) ~ a*i1, o1~i1, D(x2) ~ i2, o2~i2]
+        iob = IOBlock(eqs, [i1, i2], [o1, o2], name=:ns)
+
+        ga = getproperty(iob, :i1)
+        gb = getproperty(iob, i1)
+        gc = getproperty(iob, iob.i1)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :i2)
+        gb = getproperty(iob, i2)
+        gc = getproperty(iob, iob.i2)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :a)
+        gb = getproperty(iob, a)
+        gc = getproperty(iob, iob.a)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :x1)
+        gb = getproperty(iob, x1)
+        gc = getproperty(iob, iob.x1)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :x2)
+        gb = getproperty(iob, x2)
+        gc = getproperty(iob, iob.x2)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :o1)
+        gb = getproperty(iob, o1)
+        gc = getproperty(iob, iob.o1)
+        @test length(Set([ga,gb,gc])) == 1
+
+        ga = getproperty(iob, :o2)
+        gb = getproperty(iob, o2)
+        gc = getproperty(iob, iob.o2)
+        @test length(Set([ga,gb,gc])) == 1
+    end
+
     @testset "creation of IOBlocks" begin
         @parameters t i1(t) i2(t) a b
         @variables x1(t) x2(t) o1(t) o2(t)

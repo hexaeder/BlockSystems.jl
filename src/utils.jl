@@ -114,6 +114,12 @@ remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
 remove_namespace(x::Term) = rename(x, remove_namespace(operation(x).name))
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
+substitute_rhs(eq::Equation, rules) = eq.lhs ~ substitute(eq.rhs, rules)
+function substitute_all_rhs!(eqs::Vector{Equation}, substitutions)
+    for (i, eq) in enumerate(eqs)
+        eqs[i] = substitute_rhs(eq, substitutions)
+    end
+end
 
 uniquenames(syms) = allunique(getname.(syms))
 
@@ -178,6 +184,33 @@ lhs_var(eq::Equation) = eq_type(eq)[2]
 
 
 """
+    _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
+
+Transforms implicit algebraic equations with non-nohting lhs. If `trysolve` tries to solve them
+for lhs. Otherwise just transforms to `0 ~ rhs - lhs`.
+"""
+function _transform_implicit_algebraic(eq; trysolve=true, verbose=false)
+    (type, lhs_var) = eq_type(eq)
+    if type === :implicit_algebraic && !isnothing(lhs_var)
+        verbose && println("    Substitution resulted in implicit equation and was transformed!")
+        verbose && println("      ├ ", eq)
+        eq = 0 ~ simplify(eq.rhs - eq.lhs)
+        if trysolve && lhs_var ∈ Set(get_variables(eq.rhs))
+            try
+                eq = lhs_var ~ Symbolics.solve_for(eq, lhs_var)
+            catch e
+                verbose && println("      ├ could not be resolved!")
+            end
+        end
+        verbose && println("      └ $eq")
+        return eq
+    else
+        return eq
+    end
+end
+
+
+"""
     recursive_substitute(term, rules::Dict)
 
 Apply substitutions until there is no more change in `term`.
@@ -196,9 +229,10 @@ end
 
 Return Set of all differentials which are present in the rhs of the system.
 """
-function rhs_differentials(iob)
+rhs_differentials(iob) = rhs_differentials(equations(iob))
+function rhs_differentials(eqs::Vector{Equation})
     diffs = Set{SymbolicUtils.Symbolic}()
-    for eq in equations(iob)
+    for eq in eqs
         _collect_differentials!(diffs, eq.rhs)
     end
     return diffs
@@ -217,4 +251,23 @@ function _collect_differentials!(found, ex)
         end
     end
     return found
+end
+
+function check_metadata(exprs)
+    nometadata = []
+    for ex in exprs
+        if ex isa Equation
+            _check_metadata!(nometadata, ex.rhs)
+            _check_metadata!(nometadata, ex.lhs)
+        else
+            _check_metadata!(nometadata, ex)
+        end
+    end
+    return unique!(nometadata)
+end
+function _check_metadata!(nometadata, expr)
+    vars = Symbolics.get_variables(expr)
+    for v in vars
+        isnothing(Symbolics.metadata(v)) && push!(nometadata, v)
+    end
 end
