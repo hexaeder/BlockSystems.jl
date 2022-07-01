@@ -452,4 +452,33 @@ using Graphs
         IOSystem(:autocon, [blk1, blk2, blk3])
         IOSystem(:autocon, [blk1, blk3, blk4])
     end
+
+    @testset "globalp" begin
+        @variables t a(t) b(t) c(t)
+        @parameters i(t) K
+        @named blk1 = IOBlock([a ~ K*i, b ~ 2, c ~ 3],
+                              [i], [a,b,c])
+        @named blk2 = IOBlock([a ~ K*i],
+                              [i], [a])
+
+        sys = IOSystem(:autocon, [blk1, blk2]) |> connect_system
+        @test Set(sys.iparams) == Set([blk1.K, blk2.K])
+        @test Set(sys.inputs) == Set([blk1.i, blk2.i])
+
+        sys = IOSystem(:autocon, [blk1, blk2]; globalp=[:foo]) |> connect_system
+        @test Set(sys.iparams) == Set([blk1.K, blk2.K])
+        @test Set(sys.inputs) == Set([blk1.i, blk2.i])
+
+        sys = IOSystem(:autocon, [blk1, blk2]; globalp=[:K]) |> connect_system
+        @test Set(sys.iparams) == Set([K])
+        @test Set(sys.inputs) == Set([blk1.i, blk2.i])
+
+        sys = IOSystem(:autocon, [blk1, blk2]; globalp=[:i]) |> connect_system
+        @test Set(sys.iparams) == Set([blk1.K, blk2.K])
+        @test Set(sys.inputs) == Set([i])
+
+        sys = IOSystem(:autocon, [blk1, blk2]; globalp=[:i, :K]) |> connect_system
+        @test Set(sys.iparams) == Set([K])
+        @test Set(sys.inputs) == Set([i])
+    end
 end
