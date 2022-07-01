@@ -412,4 +412,44 @@ using Graphs
         @test BlockSpec([:i1], [:o1, :o2], in_strict=0, out_strict=0)(iob) == true
         @test BlockSpec([:i1], [:o1, :o2], in_strict=0, out_strict=1)(iob) == true
     end
+
+    @testset "test auto connections" begin
+        using BlockSystems: autoconnections
+
+        @variables t a(t) b(t) c(t)
+        @named blk1 = IOBlock([a ~ 1, b ~ 2, c ~ 3],
+                              [], [a,b,c])
+        @named blk2 = IOBlock([a ~ 1],
+                              [], [a])
+
+        @variables o1(t)
+        @parameters a(t) b(t) c(t)
+        @named blk3 = IOBlock([o1 ~ a + b + c],
+                              [a, b, c],
+                              [o1])
+        @variables o2(t)
+        @named blk4 = IOBlock([o2 ~ a + b],
+                              [a, b],
+                              [o2])
+
+        @test Set(autoconnections([blk1, blk3])) ==
+            Set([blk1.a => blk3.a,
+                 blk1.b => blk3.b,
+                 blk1.c => blk3.c])
+
+        @test Set(autoconnections([blk1, blk2, blk3])) ==
+            Set([blk1.b => blk3.b,
+                 blk1.c => blk3.c])
+
+        @test Set(autoconnections([blk1, blk3, blk4])) ==
+            Set([blk1.a => blk3.a,
+                 blk1.a => blk4.a,
+                 blk1.b => blk3.b,
+                 blk1.b => blk4.b,
+                 blk1.c => blk3.c])
+
+        IOSystem(:autocon, [blk1, blk3])
+        IOSystem(:autocon, [blk1, blk2, blk3])
+        IOSystem(:autocon, [blk1, blk3, blk4])
+    end
 end

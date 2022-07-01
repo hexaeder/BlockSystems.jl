@@ -216,6 +216,10 @@ Arguments:
     The connections in the form `sub1.output => sub2.input`. It is also possible to use simple
     algebraic equations such as `sub1.o1 + sub2.o2 => sub3.input`.
 
+    If `:autocon`, BlockSystems will automaticially create connections
+    based on matchin output and input names. This requires the output name to be unique. The
+    same output may be connected to several inputs with the same name.
+
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
    i.e. sub1.input => voltage`. Variables without entry in the map will be
@@ -247,6 +251,10 @@ function IOSystem(cons,
     nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
     nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
     nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
+
+    if cons == :autocon
+        cons = autoconnections(io_systems, nspcd_inputs, nspcd_outputs)
+    end
 
     # check validity of provided connections
     @check vars(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection may only contain outputs of subsystem."
@@ -307,6 +315,33 @@ function IOSystem(cons,
              cons,
              namespace_map,
              io_systems)
+end
+
+"""
+    autoconnections(io_systems)
+
+Create a list of namespaced connections based on variable names. Names are
+compared without namespace. A single output may connect to several inputs of
+the same name.
+"""
+function autoconnections(io_systems,
+                         nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...),
+                         nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...))
+    inputs = remove_namespace.(getname.(nspcd_inputs))
+    outputs = remove_namespace.(getname.(nspcd_outputs))
+    dupout = duplicates(outputs)
+
+    cons = Pair[]
+    for i in eachindex(outputs)
+        out = outputs[i]
+        out ∈ dupout && continue # can't connect from outputs which are not unique
+
+        idxs = findall(isequal(out), inputs)
+        if idxs !== nothing
+            append!(cons, nspcd_outputs[i].=>nspcd_inputs[idxs])
+        end
+    end
+    return cons
 end
 
 
