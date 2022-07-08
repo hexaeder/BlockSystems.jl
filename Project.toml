@@ -1,7 +1,7 @@
 name = "BlockSystems"
 uuid = "4663d367-db1f-4bef-81e7-dc1bd7f7b428"
 authors = ["Hans Würfel <git@wuerfel.io> and contributors"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
