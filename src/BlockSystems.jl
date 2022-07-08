@@ -216,6 +216,10 @@ Arguments:
     The connections in the form `sub1.output => sub2.input`. It is also possible to use simple
     algebraic equations such as `sub1.o1 + sub2.o2 => sub3.input`.
 
+    If `:autocon`, BlockSystems will automaticially create connections
+    based on matchin output and input names. This requires the output name to be unique. The
+    same output may be connected to several inputs with the same name.
+
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
    i.e. sub1.input => voltage`. Variables without entry in the map will be
@@ -229,10 +233,16 @@ Arguments:
    (and might be optimized away in `connect_system`).
  - `name`: namespace
  - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
+ - `globalp=Symbol[]`: List of symbols, which represent system-wide parameters
+   (iparams or inputs). All occurences in subsystems will be promoted to the
+   system namespace (i.e. if `globalp=[:K]`, each component block which has
+   some parameter `:K` will be represented by the same parameter rather than)
+   `blk1.K` and `blk2.K`.
 """
 function IOSystem(cons,
                   io_systems::Vector{<:AbstractIOSystem};
                   namespace_map = nothing,
+                  globalp=Symbol[],
                   outputs = :all,
                   name = gensym(:IOSystem),
                   autopromote = true)
@@ -247,6 +257,10 @@ function IOSystem(cons,
     nspcd_istates = vcat([namespace_istates(sys) for sys in io_systems]...)
     nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...)
     nspcd_rem_states = vcat([namespace_rem_states(sys) for sys in io_systems]...)
+
+    if cons == :autocon
+        cons = autoconnections(io_systems, nspcd_inputs, nspcd_outputs)
+    end
 
     # check validity of provided connections
     @check vars(first.(cons)) ⊆ Set(nspcd_outputs) "First argument in connection may only contain outputs of subsystem."
@@ -283,21 +297,35 @@ function IOSystem(cons,
         nspcd_outputs  = outputs |> collect
     end
 
-    # auto promotion of the rest
+    # globalp promotions
     all_symbols = vcat(open_inputs, nspcd_iparams, nspcd_istates, nspcd_outputs, nspcd_rem_states)
+    if !isempty(globalp)
+        globalp = getname.(globalp) # just in case there are Syms/Terms
+        left_symbols = setdiff(all_symbols, keys(namespace_map))
+        for sym in left_symbols
+            # if the promoted symbol matches name of a globalp introduce promotion
+            if remove_namespace(getname(sym)) ∈ globalp
+                namespace_map[sym] = remove_namespace(sym)
+            end
+        end
+    end
+
+    # auto promotion of the rest
     left_symbols = setdiff(all_symbols, keys(namespace_map))
-
     auto_promotions = create_namespace_promotions(collect(left_symbols), values(namespace_map), autopromote)
-
     namespace_map = merge(namespace_map, auto_promotions)
 
     # assert that there are no namespace clashes. this should be allways true!
     @assert uniquenames(keys(namespace_map)) "ERROR: complete namespace map lhs not unique: $namespace_map"
-    @assert uniquenames(values(namespace_map)) "ERROR: complete namespace map rhs not unique: $namespace_map"
+
+    if !uniquenames(values(namespace_map))
+        dups = duplicates(namespace_map)
+        @check dups ⊆ globalp "There are duplicate entries in the RHS of the namespace map, which are not in `globalp`!"
+    end
 
     nmspc_promote = ModelingToolkit.substituter(namespace_map)
-    inputs  = nmspc_promote.(open_inputs)
-    iparams = nmspc_promote.(nspcd_iparams)
+    inputs  = unique!(nmspc_promote.(open_inputs))   # global p might reduce the inputs
+    iparams = unique!(nmspc_promote.(nspcd_iparams)) # and iparams
     istates = nmspc_promote.(nspcd_istates)
     outputs = nmspc_promote.(nspcd_outputs)
     rem_states = nmspc_promote.(nspcd_rem_states)
@@ -307,6 +335,33 @@ function IOSystem(cons,
              cons,
              namespace_map,
              io_systems)
+end
+
+"""
+    autoconnections(io_systems)
+
+Create a list of namespaced connections based on variable names. Names are
+compared without namespace. A single output may connect to several inputs of
+the same name.
+"""
+function autoconnections(io_systems,
+                         nspcd_inputs = vcat([namespace_inputs(sys) for sys in io_systems]...),
+                         nspcd_outputs = vcat([namespace_outputs(sys) for sys in io_systems]...))
+    inputs = remove_namespace.(getname.(nspcd_inputs))
+    outputs = remove_namespace.(getname.(nspcd_outputs))
+    dupout = duplicates(outputs)
+
+    cons = Pair[]
+    for i in eachindex(outputs)
+        out = outputs[i]
+        out ∈ dupout && continue # can't connect from outputs which are not unique
+
+        idxs = findall(isequal(out), inputs)
+        if idxs !== nothing
+            append!(cons, nspcd_outputs[i].=>nspcd_inputs[idxs])
+        end
+    end
+    return cons
 end
 
 
