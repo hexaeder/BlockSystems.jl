@@ -271,3 +271,8 @@ function _check_metadata!(nometadata, expr)
         isnothing(Symbolics.metadata(v)) && push!(nometadata, v)
     end
 end
+
+function narrow_type(A::AbstractArray)
+    elt = mapreduce(typeof, promote_type, A)
+    convert.(elt, A)
+end

@@ -487,5 +487,6 @@ include("algebraic_elimination.jl")
 include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")
+include("LTI.jl")
 
 end

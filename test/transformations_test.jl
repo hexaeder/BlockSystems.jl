@@ -417,7 +417,6 @@ end
         D = Differential(t)
         blk = IOBlock([D(x) ~ x/a], [], [])
 
-        # this errors on MTK@0.8 currently
         ModelingToolkit.namespace_equations(simplify_eqs(blk).system)
 
         @variables a(t) b(t) c(t) d(t)
