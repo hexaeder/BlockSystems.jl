@@ -1,14 +1,15 @@
 module BlockSystems
 
 using LinearAlgebra
+using Reexport
 using DocStringExtensions
-using ModelingToolkit
+@reexport using ModelingToolkit
 using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
 using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
-using ModelingToolkit.Symbolics: tosymbol
+using Symbolics: tosymbol
 using SciMLBase
 using Graphs
 
