@@ -451,33 +451,45 @@ end
     end
 
     @testset "direct connect" begin
-        @variables t o1(t) o2(t)
-        @parameters i1(t) i2(t)
-        @named blkA = IOBlock([o1 ~ 1 + i, o2 ~ 1 - i], [i], [o1, o2])
-        @named blkB = IOBlock([o ~ 2 + i1 + 2*i2], [i1, i2], [o])
+        function safe()
+            @variables t o(t) o1(t) o2(t)
+            @parameters i(t) i1(t) i2(t)
+            @named blkA = IOBlock([o1 ~ 1 + i, o2 ~ 1 - i], [i], [o1, o2])
+            @named blkB = IOBlock([o ~ 2 + i1 + 2*i2], [i1, i2], [o])
+            return blkA, blkB
+        end
+        blkA, blkB = safe()
 
-        sys = @connect blkA.o1 => blkB.i1
-        @test Set(sys.outputs) == Set([o1, o2, o])
-        @test Set(sys.inputs) == Set([i, i2])
+        # first we try the macro as long as those symbols are not in the namespace
+        sysA = @connect blkA.o1 => blkB.i1
+        sysB = @connect blkA.(o1, o2) => blkB.(i1, i2)
+        sysC = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false
+        sysD = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false outputs=[blkB.o]
+        sysE = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining
+        sysF = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining name=:foo
 
-        sys = @connect blkA.(o1, o2) => blkB.(i1, i2)
-        @test Set(sys.outputs) == Set([o1, o2, o])
-        @test Set(sys.inputs) == Set([i])
+        # create symbols in namespace
+        @variables t o(t) o1(t) o2(t)
+        @parameters i(t) i1(t) i2(t)
 
-        @test_throws MethodError @connect blkA.o1 => blkB.(i1, i2)
-        @test_throws MethodError @connect blkA.(o1, o2) => blkB.i1
-        @test_throws ArgumentError @connect blkA.(o1, o2) => blkB.(i1)
+        @test Set(sysA.outputs) == Set([o1, o2, o])
+        @test Set(sysA.inputs) == Set([i, i2])
 
-        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false
-        @test Set(sys.outputs) == Set([blkA.o1, blkA.o2, blkB.o])
+        @test Set(sysB.outputs) == Set([o1, o2, o])
+        @test Set(sysB.inputs) == Set([i])
 
-        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false outputs=[blkB.o]
-        @test Set(sys.outputs) == Set([blkB.o])
+        @test Set(sysC.outputs) == Set([blkA.o1, blkA.o2, blkB.o])
 
-        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining
-        @test Set(sys.outputs) == Set([o])
+        @test Set(sysD.outputs) == Set([blkB.o])
 
-        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining name=:foo
-        @test sys.name == :foo
+        @test Set(sysF.outputs) == Set([o])
+        @test Set(sysE.outputs) == Set([o])
+
+        @test sysF.name == :foo
+
+
+        @named blkC = IOBlock([o ~ π*i], [i], [o])
+        sys = @connect blkA.(o1,o2)=>blkB.(i1,i2) blkB.o=>blkC.i outputs=:remaining name=:blk autopromote=:false
+        @test sys.name == :blk
     end
 end
