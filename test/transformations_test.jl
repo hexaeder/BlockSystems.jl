@@ -449,4 +449,35 @@ end
         blk2 = set_input(blk, blk.i=>a)
         @test equations(blk2) == [o ~ 2a]
     end
+
+    @testset "direct connect" begin
+        @variables t o1(t) o2(t)
+        @parameters i1(t) i2(t)
+        @named blkA = IOBlock([o1 ~ 1 + i, o2 ~ 1 - i], [i], [o1, o2])
+        @named blkB = IOBlock([o ~ 2 + i1 + 2*i2], [i1, i2], [o])
+
+        sys = @connect blkA.o1 => blkB.i1
+        @test Set(sys.outputs) == Set([o1, o2, o])
+        @test Set(sys.inputs) == Set([i, i2])
+
+        sys = @connect blkA.(o1, o2) => blkB.(i1, i2)
+        @test Set(sys.outputs) == Set([o1, o2, o])
+        @test Set(sys.inputs) == Set([i])
+
+        @test_throws MethodError @connect blkA.o1 => blkB.(i1, i2)
+        @test_throws MethodError @connect blkA.(o1, o2) => blkB.i1
+        @test_throws ArgumentError @connect blkA.(o1, o2) => blkB.(i1)
+
+        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false
+        @test Set(sys.outputs) == Set([blkA.o1, blkA.o2, blkB.o])
+
+        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false outputs=[blkB.o]
+        @test Set(sys.outputs) == Set([blkB.o])
+
+        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining
+        @test Set(sys.outputs) == Set([o])
+
+        sys = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining name=:foo
+        @test sys.name == :foo
+    end
 end

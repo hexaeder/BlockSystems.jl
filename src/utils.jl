@@ -1,3 +1,5 @@
+export @connect
+
 """
     @check cond msg
 
@@ -271,3 +273,55 @@ function _check_metadata!(nometadata, expr)
         isnothing(Symbolics.metadata(v)) && push!(nometadata, v)
     end
 end
+
+"""
+    @connect blkA.o => blkB.i kwargs...
+    @connect blkA.(o1,o2) => blkB.(i1, i2) kwargs...
+
+Quickly connect two blocks. Optional space-separated list of kw args gets
+passed down to `IOSystem` constructor.
+"""
+macro connect(ex, kwargs...)
+    if ex.head == :call && ex.args[1] == :(=>)
+        @assert length(ex.args) == 3 "Wrong number of arguments in symbolcall."
+        (b1, o) = _splitproperty(ex.args[2])
+        (b2, i) = _splitproperty(ex.args[3])
+
+        kwargs = [esc(a) for a in kwargs]
+
+        quote
+            _direct_connect($(esc(b1)), $o, $(esc(b2)), $i; $(kwargs...))
+        end
+    end
+end
+
+function _splitproperty(ex)
+    @assert ex.head == :(.)
+    if ex.args[2] isa QuoteNode
+        return ex.args[1], ex.args[2]
+    elseif ex.args[2].head == :tuple
+        return ex.args[1], Tuple(ex.args[2].args)
+    else
+        error("Cannot split $ex")
+    end
+end
+
+"""
+    _direct_connect(b1, out::Symbol/Tuplee, b2, in::Symbol/Tuple; kwargs...)
+
+Directly connect two blocks `b1` and `b2`. Intended for `@connect` macro.
+"""
+_direct_connect(b1, out::Symbol, b2, in::Symbol; kwargs...) = _direct_connect(b1, (out,), b2, (in,); kwargs...)
+function _direct_connect(b1, outputs::Tuple, b2, inputs::Tuple; name=nothing, kwargs...)
+    @check length(outputs) == length(inputs) "Quick connect requires same number of outputs and inputs!"
+
+    if isnothing(name)
+        name = string(b1.name)*"_"*string(b2.name)
+    end
+
+    cons = [getproperty(b1, out) => getproperty(b2, in) for (in, out) in zip(inputs, outputs)]
+
+    sys = IOSystem(cons, [b1, b2]; name=Symbol(name), kwargs...)
+    connect_system(sys)
+end
+

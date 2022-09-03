@@ -318,6 +318,7 @@ function rename_vars(blk::IOBlock; warn=true, kwargs...)
 end
 
 function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
+    isempty(subs) && return blk
     eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
     inputs  = map(x->substitute(x, subs), blk.inputs)
