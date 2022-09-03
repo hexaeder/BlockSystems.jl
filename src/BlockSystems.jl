@@ -3,6 +3,7 @@ module BlockSystems
 using LinearAlgebra
 using Reexport
 using DocStringExtensions
+using Symbolics
 @reexport using ModelingToolkit
 using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
@@ -223,15 +224,23 @@ Arguments:
 
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
-   i.e. sub1.input => voltage`. Variables without entry in the map will be
+   e.g. `sub1.input => voltage`. Variables without entry in the map will be
    promoted automatically. Automatic promotion means that the sub-namespace is
    removed whenever it is possible without naming conflicts. The map may contain
    inputs, outputs, istates, iparams and removed_states. The rhs of the map can be provided
    as as Symbol: `sub1.input => :newname`.
- - `outputs`: Per default, all of the subsystem outputs will become system outputs. However,
-   by providing a list of variables as outputs *only these* will become outputs of the
-   new system. All other sub-outputs will become internal states of the connected system
-   (and might be optimized away in `connect_system`).
+ - Specify outputs of composite system:
+
+   `outputs=:all` (default): All of the subsystem outputs will become system
+   outputs.
+
+   `outputs=:remaining`: Outputs, which have been used in `connections` won't
+   become outputs of the composite system.
+
+   `outputs=[sub1.o, sub2.o]`: only specified outputs will become outputs of
+   composite sytem. All other sub-outputs will become internal states of the
+   connected system (and might be optimized away in `connect_system`).
+
  - `name`: namespace
  - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
  - `globalp=Symbol[]`: List of symbols, which represent system-wide parameters
@@ -279,23 +288,28 @@ function IOSystem(cons,
 
     # if the user provided a list of outputs, all other outputs become istates
     if outputs != :all
-        outputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
-        # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
-        for (i, o) in enumerate(outputs)
-            if o ∉ Set(nspcd_outputs)
-                if o isa Symbol
-                    key = findfirst(v->isequal(getname(v), o), namespace_map)
-                else
-                    key = findfirst(v->isequal(v, o), namespace_map)
+        if outputs == :remaining
+            former_outputs = first.(cons)
+            newoutputs = setdiff(nspcd_outputs, former_outputs)
+        else
+            newoutputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
+            # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
+            for (i, o) in enumerate(newoutputs)
+                if o ∉ Set(nspcd_outputs)
+                    if o isa Symbol
+                        key = findfirst(v->isequal(getname(v), o), namespace_map)
+                    else
+                        key = findfirst(v->isequal(v, o), namespace_map)
+                    end
+                    # check if key references a output (namespace_map contains all)
+                    key ∉ Set(nspcd_outputs) && throw(ArgumentError("Output $o ∉ outputs ∪ outputs_promoted"))
+                    newoutputs[i] = key
                 end
-                # check if key references a output (namespace_map contains all)
-                key ∉ Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
-                outputs[i] = key
             end
+            former_outputs = setdiff(nspcd_outputs, newoutputs)
         end
-        former_outputs = setdiff(nspcd_outputs, outputs)
         nspcd_istates  = vcat(nspcd_istates, former_outputs)
-        nspcd_outputs  = outputs |> collect
+        nspcd_outputs  = newoutputs |> collect
     end
 
     # globalp promotions
