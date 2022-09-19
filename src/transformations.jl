@@ -1,4 +1,5 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs, set_input
+export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
+export set_p, simplify_eqs, set_input, make_input, make_iparam
 
 """
 $(SIGNATURES)
@@ -386,4 +387,45 @@ function set_input(blk::IOBlock, p::Pair; verbose=false)
                     [tmpblk, blk];
                    outputs=namespace_outputs(blk), name=blk.name)
     return connect_system(sys; verbose)
+end
+
+"""
+    make_input(blk::IOBlock, sym; warn=true)
+
+Change given sym from iparam to input.
+"""
+function make_input(blk::IOBlock, sym; warn=true)
+    var_nspcd = getproperty(blk, sym)
+    var = remove_namespace(blk.name, var_nspcd)
+    @check var ∈ Set(blk.iparams) "$sym is not an iparam of block."
+
+    varname = getname(var)
+    iv = get_iv(blk)
+    tmp, = @parameters $varname(iv)
+
+    sub = var => tmp
+    eqs     = map(eq->eqsubstitute(eq, sub), equations(blk))
+    rem_eqs = map(eq->eqsubstitute(eq, sub), blk.removed_eqs)
+
+    IOBlock(blk.name, eqs, vcat(blk.inputs,tmp), blk.outputs, rem_eqs; iv, warn)
+end
+
+"""
+    make_iparam(blk::IOBlock, sym; warn=true)
+
+Change given sym from input to iparam.
+"""
+function make_iparam(blk::IOBlock, sym; warn=true)
+    var_nspcd = getproperty(blk, sym)
+    var = remove_namespace(blk.name, var_nspcd)
+    @check var ∈ Set(blk.inputs) "$sym is not an input of block."
+
+    varname = getname(var)
+    iv = get_iv(blk)
+    tmp, = @parameters $varname
+    sub = var => tmp
+    eqs     = map(eq->eqsubstitute(eq, sub), equations(blk))
+    rem_eqs = map(eq->eqsubstitute(eq, sub), blk.removed_eqs)
+
+    IOBlock(blk.name, eqs, filter(!isequal(var), blk.inputs), blk.outputs, rem_eqs; iv, warn)
 end

@@ -442,6 +442,34 @@ end
         @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
     end
 
+    @testset "transform inputs to iparams and vice versa" begin
+        using BlockSystems: make_input, make_iparam
+        @variables t out(t)
+        @parameters in(t) p
+
+        blkA = IOBlock([out ~ in + p], [in], [out])
+
+        @test_throws ArgumentError make_input(blkA, :in)
+        blkB1 = make_input(blkA, :p)
+        blkB2 = make_input(blkA, p)
+        blkB3 = make_input(blkA, blkA.p)
+        @test isempty(blkB1.iparams)
+        @test isempty(blkB2.iparams)
+        @test isempty(blkB3.iparams)
+        @test Set(blkB1.inputs) == Set(blkB2.inputs) == Set(blkB3.inputs)
+        @test length(blkB1.inputs) == 2
+
+        @test_throws ArgumentError make_iparam(blkA, :p)
+        blkC1 = make_iparam(blkA, :in)
+        blkC2 = make_iparam(blkA, in)
+        blkC3 = make_iparam(blkA, blkA.in)
+        @test isempty(blkC1.inputs)
+        @test isempty(blkC2.inputs)
+        @test isempty(blkC3.inputs)
+        @test Set(blkC1.iparams) == Set(blkC2.iparams) == Set(blkC3.iparams)
+        @test length(blkC1.iparams) == 2
+    end
+
     @testset "simplify eqs" begin
         @parameters t a
         @variables x(t)
