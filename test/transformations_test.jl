@@ -411,6 +411,37 @@ end
         @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
     end
 
+    @testset "set p for inputs" begin
+        @parameters t a(t) b(t)
+        @variables x(t) y(t) z(t)
+        D = Differential(t)
+
+        blk = IOBlock([D(x) ~ 1 + D(y) + a + b], [a, b], [])
+
+        blk2 = set_p(blk, :a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = set_p(blk, blk.a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = set_p(blk, a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+
+        blk2 = set_p(blk, :b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = set_p(blk, blk.b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = set_p(blk, b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+
+        blk2 = set_p(blk, Dict(blk.a=>2, b=>4))
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        blk2 = set_p(blk, blk.a=>2, b=>4; warn=false)
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        @test_throws ArgumentError blk2 = set_p(blk, :a=>:bla)
+        @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
+    end
+
     @testset "simplify eqs" begin
         @parameters t a
         @variables x(t)

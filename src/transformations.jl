@@ -330,14 +330,18 @@ end
 """
     set_p(blk::IOBlock, p::Dict; warn=true)
     set_p(blk::IOBlock, p::Pair; warn=true)
+    set_p(blk::IOBlock; warn=true, p1=val1, p2=val2)
 
-Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters.
+Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters. Can be used
+for both iparams as well as inputs!
 
 Keys of dict can be either `Symbols` or the `Symbolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
 """
 function set_p(blk::IOBlock, p::Dict; warn=true)
     subs = Dict{Symbolic, Float64}()
-    validp = Set(blk.iparams)
+    validp  = Set(blk.iparams)
+    validin = Set(blk.inputs)
+    closedinputs = Set()
     for k in keys(p)
         try
             sym = getproperty(blk, k)
@@ -346,16 +350,21 @@ function set_p(blk::IOBlock, p::Dict; warn=true)
             continue
         end
         sym = remove_namespace(blk.name, sym)
-        @check sym ∈ validp "Symbol $sym is not iparam of block"
+        if sym ∈ validin
+            push!(closedinputs, sym)
+        else
+            @check sym ∈ validp "Symbol $sym is not iparam of block"
+        end
         @check p[k] isa Number "p value has to be a number! Maybe you are looking for `rename_vars` instead?"
         subs[sym] = p[k]
     end
     eqs     = map(eq->eqsubstitute(eq, subs), equations(blk))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk), warn)
+    IOBlock(blk.name, eqs, setdiff(blk.inputs,closedinputs), blk.outputs, rem_eqs; iv=get_iv(blk), warn)
 end
 
 set_p(blk::IOBlock, p...; warn=true) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
+set_p(blk::IOBlock; warn=true, kwargs...) = set_p(blk, Dict(kwargs); warn)
 
 """
     set_input(blk::IOBlock, p::Pair; verbose=false)
