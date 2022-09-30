@@ -411,6 +411,65 @@ end
         @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
     end
 
+    @testset "set p for inputs" begin
+        @parameters t a(t) b(t)
+        @variables x(t) y(t) z(t)
+        D = Differential(t)
+
+        blk = IOBlock([D(x) ~ 1 + D(y) + a + b], [a, b], [])
+
+        blk2 = set_p(blk, :a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = set_p(blk, blk.a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = set_p(blk, a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+
+        blk2 = set_p(blk, :b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = set_p(blk, blk.b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = set_p(blk, b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+
+        blk2 = set_p(blk, Dict(blk.a=>2, b=>4))
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        blk2 = set_p(blk, blk.a=>2, b=>4; warn=false)
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        @test_throws ArgumentError blk2 = set_p(blk, :a=>:bla)
+        @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
+    end
+
+    @testset "transform inputs to iparams and vice versa" begin
+        using BlockSystems: make_input, make_iparam
+        @variables t out(t)
+        @parameters in(t) p
+
+        blkA = IOBlock([out ~ in + p], [in], [out])
+
+        @test_throws ArgumentError make_input(blkA, :in)
+        blkB1 = make_input(blkA, :p)
+        blkB2 = make_input(blkA, p)
+        blkB3 = make_input(blkA, blkA.p)
+        @test isempty(blkB1.iparams)
+        @test isempty(blkB2.iparams)
+        @test isempty(blkB3.iparams)
+        @test Set(blkB1.inputs) == Set(blkB2.inputs) == Set(blkB3.inputs)
+        @test length(blkB1.inputs) == 2
+
+        @test_throws ArgumentError make_iparam(blkA, :p)
+        blkC1 = make_iparam(blkA, :in)
+        blkC2 = make_iparam(blkA, in)
+        blkC3 = make_iparam(blkA, blkA.in)
+        @test isempty(blkC1.inputs)
+        @test isempty(blkC2.inputs)
+        @test isempty(blkC3.inputs)
+        @test Set(blkC1.iparams) == Set(blkC2.iparams) == Set(blkC3.iparams)
+        @test length(blkC1.iparams) == 2
+    end
+
     @testset "simplify eqs" begin
         @parameters t a
         @variables x(t)
@@ -448,5 +507,48 @@ end
         @test equations(blk2) == [o ~ 2a]
         blk2 = set_input(blk, blk.i=>a)
         @test equations(blk2) == [o ~ 2a]
+    end
+
+    @testset "direct connect" begin
+        function safe()
+            @variables t o(t) o1(t) o2(t)
+            @parameters i(t) i1(t) i2(t)
+            @named blkA = IOBlock([o1 ~ 1 + i, o2 ~ 1 - i], [i], [o1, o2])
+            @named blkB = IOBlock([o ~ 2 + i1 + 2*i2], [i1, i2], [o])
+            return blkA, blkB
+        end
+        blkA, blkB = safe()
+
+        # first we try the macro as long as those symbols are not in the namespace
+        sysA = @connect blkA.o1 => blkB.i1
+        sysB = @connect blkA.(o1, o2) => blkB.(i1, i2)
+        sysC = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false
+        sysD = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false outputs=[blkB.o]
+        sysE = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining
+        sysF = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining name=:foo
+
+        # create symbols in namespace
+        @variables t o(t) o1(t) o2(t)
+        @parameters i(t) i1(t) i2(t)
+
+        @test Set(sysA.outputs) == Set([o1, o2, o])
+        @test Set(sysA.inputs) == Set([i, i2])
+
+        @test Set(sysB.outputs) == Set([o1, o2, o])
+        @test Set(sysB.inputs) == Set([i])
+
+        @test Set(sysC.outputs) == Set([blkA.o1, blkA.o2, blkB.o])
+
+        @test Set(sysD.outputs) == Set([blkB.o])
+
+        @test Set(sysF.outputs) == Set([o])
+        @test Set(sysE.outputs) == Set([o])
+
+        @test sysF.name == :foo
+
+
+        @named blkC = IOBlock([o ~ π*i], [i], [o])
+        sys = @connect blkA.(o1,o2)=>blkB.(i1,i2) blkB.o=>blkC.i outputs=:remaining name=:blk autopromote=:false
+        @test sys.name == :blk
     end
 end

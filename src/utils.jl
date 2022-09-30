@@ -1,3 +1,5 @@
+export @connect
+
 """
     @check cond msg
 
@@ -269,5 +271,54 @@ function _check_metadata!(nometadata, expr)
     vars = Symbolics.get_variables(expr)
     for v in vars
         isnothing(Symbolics.metadata(v)) && push!(nometadata, v)
+    end
+end
+
+"""
+    @connect blkA.o => blkB.i
+    @connect blkA.o=>blkB.i blkB.o=>blkC.i kwargs...
+    @connect blkA.(o1,o2) => blkB.(i1, i2) kwargs...
+
+Quickly connect several blocks. Optional space-separated list of kw args gets
+passed down to `IOSystem` constructor.
+"""
+macro connect(exprs...)
+    cons = Expr[]
+    kwargs = Expr[]
+    systems = Set{Expr}()
+    for ex in exprs
+        if Meta.isexpr(ex, :call) && ex.args[1] == :(=>)
+            _collect_connections!(systems, cons, ex.args[2], ex.args[3])
+        elseif Meta.isexpr(ex, :(=))
+            push!(kwargs, esc(ex))
+        else
+            throw(ArgumentError("Cannot make sense of $ex."))
+        end
+    end
+    quote
+        IOSystem([$(cons...)], [$(systems...)]; $(kwargs...)) |> connect_system
+    end
+end
+
+function _collect_connections!(systems, cons, p1, p2)
+    blkA = esc(p1.args[1])
+    blkB = esc(p2.args[1])
+    push!(systems, blkA)
+    push!(systems, blkB)
+    if p1.args[2] isa QuoteNode && p2.args[2] isa QuoteNode
+        push!(cons, :($(esc(p1)) => $(esc(p2))))
+    elseif p1.args[2] isa Expr && p2.args[2] isa Expr
+        @assert p1.args[2].head == p2.args[2].head == :tuple
+        outs = p1.args[2].args
+        ins  = p2.args[2].args
+
+        @assert length(outs) == length(ins) "$p1 => $p2 not of same length."
+        for (i, o) in zip(ins, outs)
+            iesc = Meta.quot(i)
+            oesc = Meta.quot(o)
+            push!(cons, :(getproperty($blkA, $oesc) => getproperty($blkB, $iesc)))
+        end
+    else
+        throw(ArgumentError("Cannot make sens of pair $p1 => $p2"))
     end
 end
