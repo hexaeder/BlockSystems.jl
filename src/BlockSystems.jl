@@ -16,6 +16,8 @@ using Graphs
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
+const WARN=Ref(true)
+
 include("utils.jl")
 
 """
@@ -152,11 +154,11 @@ D = Differential(t)
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=true)
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=WARN[])
     IOBlock(name, eqs, inputs, outputs, Equation[]; iv, warn)
 end
 
-function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=true)
+function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=WARN[])
     os = ODESystem(eqs, iv; name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -173,7 +175,7 @@ $(SIGNATURES)
 
 Construct a new IOBlock based on an existing. Deep-copy all fields and assigns new name.
 """
-function IOBlock(iob::IOBlock; name=gensym(:IOBlock), warn=true)
+function IOBlock(iob::IOBlock; name=gensym(:IOBlock), warn=WARN[])
     cp = deepcopy(iob)
     odes = ODESystem(get_eqs(cp.system), get_iv(cp), name=name)
     IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs; warn)

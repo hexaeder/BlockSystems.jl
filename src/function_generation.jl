@@ -16,7 +16,7 @@ optional:
 - `f_params`: define parameters which should appear first
 - `f_rem_states`: define removed states algebraic state order
 - `expression=Val{false}`: toggle expression and callable function output
-- `warn=true`: toggle warnings for missing `f_*` parameters
+- `warn=WARN[]`: toggle warnings for missing `f_*` parameters
 
 Returns an named tuple with the fields
 - for `type=:ode`:
@@ -36,7 +36,7 @@ Returns an named tuple with the fields
 """
 function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [],
                               f_params = [], f_rem_states = [],
-                              expression = Val{false}, verbose=false, type=:auto, warn=true)
+                              expression = Val{false}, verbose=false, type=:auto, warn=WARN[])
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
@@ -154,7 +154,7 @@ end
 
 Return an `ODEFunction` object with the corresponding mass matrix and variable names.
 """
-function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=true)
+function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=WARN[])
     @check isempty(iob.inputs) "all inputs must be closed"
     gen = generate_io_function(iob; f_states, f_params, verbose, warn);
     observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
