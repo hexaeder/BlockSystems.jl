@@ -13,6 +13,7 @@ using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
 using Symbolics: tosymbol
 using SciMLBase
 using Graphs
+using SnoopPrecompile
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
@@ -505,4 +506,73 @@ include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")
 
+@precompile_all_calls begin
+    @parameters t i1(t) i2(t) a b ina(t) inb(t)
+    @variables x1(t) x2(t) o(t) add(t)
+
+    D = Differential(t)
+    eqs1  = [D(x1) ~ a*i1, D(x2)~i2, o~x1+x2]
+    iob1 = IOBlock(eqs1, [i1, i2], [o], name=:iob1)
+
+    iob1.i1
+    iob1.a
+    iob1.o
+
+    eqs2  = [D(x1) ~ b*i1, D(x2)~i2, o~x1+x2]
+    iob2 = IOBlock(eqs2, [i1, i2], [o], name=:iob2)
+
+    ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
+    sys = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                   [iob1, iob2, ioadd],
+                   name=:sys)
+
+    sys.iob1₊i1
+    sys.iob2₊i1
+    sys.add
+
+    # provide maps
+    @parameters in1(t) in2(t) in3(t) in4(t) p1 p2
+    @variables out(t) y1(t) y2(t)
+    sys1 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                    [iob1, iob2, ioadd],
+                    namespace_map = Dict(iob1.i1 => in1,
+                                         iob1.i2 => in2,
+                                         iob2.i1 => in3,
+                                         iob2.i2 => in4,
+                                         iob1.a => p1,
+                                         iob2.b => p2,
+                                         iob1.x1 => y1,
+                                         iob1.x2 => y2,
+                                         iob2.x1 => x1,
+                                         iob2.x2 => x2,
+                                         ioadd.add => out),
+                    outputs = [ioadd.add],
+                    name=:sys)
+
+    sys2 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                    [iob1, iob2, ioadd],
+                    namespace_map = Dict(iob1.i1 => :in1,
+                                         iob1.i2 => :in2,
+                                         iob2.i1 => :in3,
+                                         iob2.i2 => :in4,
+                                         iob1.a => :p1,
+                                         iob2.b => :p2,
+                                         iob1.x1 => :y1,
+                                         iob1.x2 => :y2,
+                                         iob2.x1 => :x1,
+                                         iob2.x2 => :x2,
+                                         ioadd.add => :out),
+                    outputs = [:out],
+                    name=:sys)
+    con = connect_system(sys)
+    con.iob1₊i1
+    con.iob2₊i1
+    con.add
+    con1 = connect_system(sys1)
+    con2 = connect_system(sys2)
+    generate_io_function(con);
+    generate_io_function(con1);
+    generate_io_function(con2);
 end
+
+end # module
