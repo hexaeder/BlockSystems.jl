@@ -1,5 +1,5 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
-export set_p, simplify_eqs, set_input, make_input, make_iparam
+export connect_system, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
+export simplify_eqs, set_input, make_input, make_iparam, replace_vars
 
 """
 $(SIGNATURES)
@@ -295,77 +295,59 @@ function simplify_eqs(iob::IOBlock; verbose=false, warn=WARN[], hotfix=true)
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
-
 """
-    rename_vars(blk::IOBLock; warn=WARN[], kwargs...)
-    rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=WARN[])
+    replace_vars(blk::IOBlock, p::Dict; warn=WARN[])
+    replace_vars(blk::IOBlock, p::Pair; warn=WARN[])
+    replace_vars(blk::IOBlock; warn=WARN[], v1=val1, v2=val2)
 
-Returns new IOBlock which is similar to blk but with new variable names.
-Variable renaming should be provided as keyword arguments, i.e.
-
-    rename_vars(blk; x=:newx, k=:knew)
-
-to rename `x(t)=>newx(t)` and `k=>knew`. Substitutions can be also provided as
-dict of `Symbolic` types (`Sym`s and `Term`s).
-"""
-function rename_vars(blk::IOBlock; warn=WARN[], kwargs...)
-    substitutions = Dict{Symbolic, Symbolic}()
-    for pair in kwargs
-        key = remove_namespace(blk.name, getproperty(blk, pair.first))
-        val = rename(key, pair.second)
-        substitutions[key] = val
-    end
-    rename_vars(blk, substitutions; warn)
-end
-
-function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=WARN[])
-    isempty(subs) && return blk
-    eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
-    rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    inputs  = map(x->substitute(x, subs), blk.inputs)
-    outputs = map(x->substitute(x, subs), blk.outputs)
-    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk), warn)
-end
-
-
-"""
-    set_p(blk::IOBlock, p::Dict; warn=WARN[])
-    set_p(blk::IOBlock, p::Pair; warn=WARN[])
-    set_p(blk::IOBlock; warn=WARN[], p1=val1, p2=val2)
-
-Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters. Can be used
-for both iparams as well as inputs!
+Replace variables, either rename them by giving a new `Symbol` or replace them by actual numerical values
+(only possible for inputs and iparams). Returns new `IOBlock`.
 
 Keys of dict can be either `Symbols` or the `Symbolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
+
+    replace_vars(blk; π = 3.14, foo = :bar) # set blk.π to number and rename foo
+    replace_vars(blk, Dict(:π => 3.14, :foo = :bar))
+    replace_vars(blk, blk.π => 3.14)
 """
-function set_p(blk::IOBlock, p::Dict; warn=WARN[])
-    subs = Dict{Symbolic, Float64}()
+replace_vars(blk::IOBlock, s...; warn=WARN[]) = length(s) > 1 ? replace_vars(blk, Dict(s); warn) : replace_vars(blk, Dict(only(s)); warn)
+replace_vars(blk::IOBlock; warn=WARN[], kwargs...) = replace_vars(blk, Dict(kwargs); warn)
+function replace_vars(blk::IOBlock, dict::Dict; warn=WARN[])
+    subs = Dict{Symbolic, Any}()
     validp  = Set(blk.iparams)
     validin = Set(blk.inputs)
     closedinputs = Set()
-    for k in keys(p)
+    for (k,v) in dict
         try
             sym = getproperty(blk, k)
         catch
-            warn && @warn "Symbol $k not present in block. Skipped."
+            warn && @warn "Symbol :$k not present in block. Skipped."
             continue
         end
         sym = remove_namespace(blk.name, sym)
-        if sym ∈ validin
-            push!(closedinputs, sym)
-        else
-            @check sym ∈ validp "Symbol $sym is not iparam of block"
+
+        if v isa Number
+            # replace path
+            if sym ∈ validin
+                push!(closedinputs, sym)
+            else
+                @check sym ∈ validp "Symbol $sym is neither iparam nor input of block. Can not repalace with number."
+            end
+            subs[sym] = dict[k]
+        elseif v isa Symbol || v isa Symbolic
+            # rename path
+            val = rename(sym, v)
+            subs[sym] = val
         end
-        @check p[k] isa Number "p value has to be a number! Maybe you are looking for `rename_vars` instead?"
-        subs[sym] = p[k]
     end
     eqs     = map(eq->eqsubstitute(eq, subs), equations(blk))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    IOBlock(blk.name, eqs, setdiff(blk.inputs,closedinputs), blk.outputs, rem_eqs; iv=get_iv(blk), warn)
-end
 
-set_p(blk::IOBlock, p...; warn=WARN[]) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
-set_p(blk::IOBlock; warn=WARN[], kwargs...) = set_p(blk, Dict(kwargs); warn)
+    newinputs = setdiff(blk.inputs, closedinputs)      # kick substitutions by number out
+    newinputs = map(x->substitute(x, subs), newinputs) # replace new names
+    newoutputs = map(x->substitute(x, subs), blk.outputs)
+
+    IOBlock(blk.name, eqs, newinputs, newoutputs, rem_eqs; iv=get_iv(blk), warn)
+end
 
 """
     set_input(blk::IOBlock, p::Pair; verbose=false)

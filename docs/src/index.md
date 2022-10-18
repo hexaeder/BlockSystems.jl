@@ -49,12 +49,14 @@ connect_system
 ```
 There are also other transformations available
 ```@docs
-rename_vars
+replace_vars
+make_input
+make_iparam
+set_input
 remove_superfluous_states
 substitute_algebraic_states
 substitute_derivatives
 simplify_eqs
-set_p
 ```
 
 ## Function building
