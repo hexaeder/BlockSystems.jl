@@ -6,13 +6,14 @@ Pkg.develop(PackageSpec(path=dirname(@__DIR__))) # adds the package this script 
 Pkg.instantiate()
 Pkg.update()
 
+using LiveServer
+@async serve(dir=joinpath(@__DIR__, "build"))
+
 run = true
 while run
     include("make.jl")
 
-    using LiveServer; serve(dir=joinpath(@__DIR__, "build"))
-
-    println("Run again? Enter! Exit witn 'q'.")
+    println("Run again? Enter! Exit with 'q'.")
     if readline() == "q"
         global run = false
     end
