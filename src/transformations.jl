@@ -294,6 +294,26 @@ function simplify_eqs(iob::IOBlock; verbose=false, warn=WARN[], hotfix=true)
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
+function transform_explicit_algebraic_outputs(iob::IOBlock; warn=WARN[], verbose=false)
+    iv = get_iv(iob)
+    neweqs = deepcopy(equations(iob))
+    idxs = findall(neweqs) do eq
+        type, var = eq_type(eq)
+        type == :explicit_algebraic && var ∈ Set(iob.outputs)
+    end
+    dt = Differential(iv)
+    for i in idxs
+        eq = neweqs[i]
+        neweqs[i] = dt(eq.lhs) ~ expand_derivatives(dt(eq.rhs))
+    end
+    if verbose
+        @info "Transformed Equations" neweqs[idxs]
+    end
+
+    iob = IOBlock(iob.name, neweqs, iob.inputs, iob.outputs, iob.removed_eqs; iv, warn)
+    substitute_derivatives(iob; warn, verbose)
+end
+
 """
     replace_vars(blk::IOBlock, p::Dict; warn=WARN[])
     replace_vars(blk::IOBlock, p::Pair; warn=WARN[])
