@@ -1,18 +1,24 @@
 module BlockSystems
 
 using LinearAlgebra
+using Reexport
 using DocStringExtensions
-using ModelingToolkit
+using Symbolics
+@reexport using ModelingToolkit
 using ModelingToolkit: ODESystem, Differential
 using ModelingToolkit: get_iv, get_eqs, get_states
 using ModelingToolkit: rename, getname, renamespace, namespace_equation, namespace_equations, value, vars
 using ModelingToolkit: equation_dependencies, asgraph, variable_dependencies, eqeq_dependencies, varvar_dependencies
 using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
-using ModelingToolkit.Symbolics: tosymbol
+using Symbolics: tosymbol
 using SciMLBase
 using Graphs
+using SnoopPrecompile
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
+
+const WARN=Ref(true)
+const WARN_SIMPLIFY=Ref(true)
 
 include("utils.jl")
 
@@ -150,11 +156,11 @@ D = Differential(t)
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=true)
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=WARN[])
     IOBlock(name, eqs, inputs, outputs, Equation[]; iv, warn)
 end
 
-function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=true)
+function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=WARN[])
     os = ODESystem(eqs, iv; name = name)
 
     inputs = value.(inputs) # gets the inputs as `tern` type
@@ -171,7 +177,7 @@ $(SIGNATURES)
 
 Construct a new IOBlock based on an existing. Deep-copy all fields and assigns new name.
 """
-function IOBlock(iob::IOBlock; name=gensym(:IOBlock), warn=true)
+function IOBlock(iob::IOBlock; name=gensym(:IOBlock), warn=WARN[])
     cp = deepcopy(iob)
     odes = ODESystem(get_eqs(cp.system), get_iv(cp), name=name)
     IOBlock(name, cp.inputs, cp.iparams, cp.istates, cp.outputs, odes, cp.removed_eqs; warn)
@@ -222,15 +228,23 @@ Arguments:
 
  - `io_systems`: Vector of subsystems
  - `namespace_map`: Provide collection of custom namespace promotions / renamings
-   i.e. sub1.input => voltage`. Variables without entry in the map will be
+   e.g. `sub1.input => voltage`. Variables without entry in the map will be
    promoted automatically. Automatic promotion means that the sub-namespace is
    removed whenever it is possible without naming conflicts. The map may contain
    inputs, outputs, istates, iparams and removed_states. The rhs of the map can be provided
    as as Symbol: `sub1.input => :newname`.
- - `outputs`: Per default, all of the subsystem outputs will become system outputs. However,
-   by providing a list of variables as outputs *only these* will become outputs of the
-   new system. All other sub-outputs will become internal states of the connected system
-   (and might be optimized away in `connect_system`).
+ - Specify outputs of composite system:
+
+   `outputs=:all` (default): All of the subsystem outputs will become system
+   outputs.
+
+   `outputs=:remaining`: Outputs, which have been used in `connections` won't
+   become outputs of the composite system.
+
+   `outputs=[sub1.o, sub2.o]`: only specified outputs will become outputs of
+   composite sytem. All other sub-outputs will become internal states of the
+   connected system (and might be optimized away in `connect_system`).
+
  - `name`: namespace
  - `autopromote=true`: enable/disable automatic promotion of variable names to system namespace
  - `globalp=Symbol[]`: List of symbols, which represent system-wide parameters
@@ -278,23 +292,28 @@ function IOSystem(cons,
 
     # if the user provided a list of outputs, all other outputs become istates
     if outputs != :all
-        outputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
-        # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
-        for (i, o) in enumerate(outputs)
-            if o ∉ Set(nspcd_outputs)
-                if o isa Symbol
-                    key = findfirst(v->isequal(getname(v), o), namespace_map)
-                else
-                    key = findfirst(v->isequal(v, o), namespace_map)
+        if outputs == :remaining
+            former_outputs = first.(cons)
+            newoutputs = setdiff(nspcd_outputs, former_outputs)
+        else
+            newoutputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
+            # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
+            for (i, o) in enumerate(newoutputs)
+                if o ∉ Set(nspcd_outputs)
+                    if o isa Symbol
+                        key = findfirst(v->isequal(getname(v), o), namespace_map)
+                    else
+                        key = findfirst(v->isequal(v, o), namespace_map)
+                    end
+                    # check if key references a output (namespace_map contains all)
+                    key ∉ Set(nspcd_outputs) && throw(ArgumentError("Output $o ∉ outputs ∪ outputs_promoted"))
+                    newoutputs[i] = key
                 end
-                # check if key references a output (namespace_map contains all)
-                key ∉ Set(nspcd_outputs) && throw(ArgumentError("output $o ∉ outputs ∪ outputs_promoted"))
-                outputs[i] = key
             end
+            former_outputs = setdiff(nspcd_outputs, newoutputs)
         end
-        former_outputs = setdiff(nspcd_outputs, outputs)
         nspcd_istates  = vcat(nspcd_istates, former_outputs)
-        nspcd_outputs  = outputs |> collect
+        nspcd_outputs  = newoutputs |> collect
     end
 
     # globalp promotions
@@ -488,5 +507,75 @@ include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")
 include("LTI.jl")
+include("deprecated.jl")
 
+@precompile_all_calls begin
+    @parameters t i1(t) i2(t) a b ina(t) inb(t)
+    @variables x1(t) x2(t) o(t) add(t)
+
+    D = Differential(t)
+    eqs1  = [D(x1) ~ a*i1, D(x2)~i2, o~x1+x2]
+    iob1 = IOBlock(eqs1, [i1, i2], [o], name=:iob1)
+
+    iob1.i1
+    iob1.a
+    iob1.o
+
+    eqs2  = [D(x1) ~ b*i1, D(x2)~i2, o~x1+x2]
+    iob2 = IOBlock(eqs2, [i1, i2], [o], name=:iob2)
+
+    ioadd = IOBlock([add ~ ina + inb], [ina, inb], [add], name=:add)
+    sys = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                   [iob1, iob2, ioadd],
+                   name=:sys)
+
+    sys.iob1₊i1
+    sys.iob2₊i1
+    sys.add
+
+    # provide maps
+    @parameters in1(t) in2(t) in3(t) in4(t) p1 p2
+    @variables out(t) y1(t) y2(t)
+    sys1 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                    [iob1, iob2, ioadd],
+                    namespace_map = Dict(iob1.i1 => in1,
+                                         iob1.i2 => in2,
+                                         iob2.i1 => in3,
+                                         iob2.i2 => in4,
+                                         iob1.a => p1,
+                                         iob2.b => p2,
+                                         iob1.x1 => y1,
+                                         iob1.x2 => y2,
+                                         iob2.x1 => x1,
+                                         iob2.x2 => x2,
+                                         ioadd.add => out),
+                    outputs = [ioadd.add],
+                    name=:sys)
+
+    sys2 = IOSystem([iob1.o => ioadd.ina, iob2.o => ioadd.inb],
+                    [iob1, iob2, ioadd],
+                    namespace_map = Dict(iob1.i1 => :in1,
+                                         iob1.i2 => :in2,
+                                         iob2.i1 => :in3,
+                                         iob2.i2 => :in4,
+                                         iob1.a => :p1,
+                                         iob2.b => :p2,
+                                         iob1.x1 => :y1,
+                                         iob1.x2 => :y2,
+                                         iob2.x1 => :x1,
+                                         iob2.x2 => :x2,
+                                         ioadd.add => :out),
+                    outputs = [:out],
+                    name=:sys)
+    con = connect_system(sys)
+    con.iob1₊i1
+    con.iob2₊i1
+    con.add
+    con1 = connect_system(sys1)
+    con2 = connect_system(sys2)
+    generate_io_function(con);
+    generate_io_function(con1);
+    generate_io_function(con2);
 end
+
+end # module

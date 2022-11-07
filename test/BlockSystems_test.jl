@@ -481,4 +481,20 @@ using Graphs
         @test Set(sys.iparams) == Set([K])
         @test Set(sys.inputs) == Set([i])
     end
+
+    @testset "system output specification" begin
+        @variables t o(t)
+        @parameters i(t)
+        @named blkA = IOBlock([o ~ 1 + i], [i], [o])
+        @named blkB = IOBlock([o ~ 2 + i], [i], [o])
+
+        sys = IOSystem([blkA.o => blkB.i], [blkA, blkB]) |> connect_system
+        @test Set(sys.outputs) == Set([blkA.o, blkB.o])
+
+        sys = IOSystem([blkA.o => blkB.i], [blkA, blkB], outputs=[blkB.o]) |> connect_system
+        @test Set(sys.outputs) == Set([blkB.o])
+
+        sys = IOSystem([blkA.o => blkB.i], [blkA, blkB], outputs=:remaining) |> connect_system
+        @test Set(sys.outputs) == Set([blkB.o])
+    end
 end

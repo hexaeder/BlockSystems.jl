@@ -185,9 +185,10 @@ end
                                   A₊o ~ A₊x1 + A₊x2,
                                   B₊o ~ B₊x1 + B₊x2]
 
-        @testset "test rename_vars" begin
-            @test_throws ArgumentError new = rename_vars(iob, in2=:in1)
-            new = rename_vars(iob, in2=:in2N, out=:outN, A₊x1=:y, a=:c)
+        @testset "test rename of vars" begin
+            # test uses replace_vars now since rename_vars is deprecated
+            @test_throws ArgumentError new = replace_vars(iob, in2=:in1)
+            new = replace_vars(iob, in2=:in2N, out=:outN, A₊x1=:y, a=:c)
 
             @parameters in2N(t) c
             @variables outN(t) y(t)
@@ -196,7 +197,7 @@ end
                    D(B₊x1) ~ b * in3,
                    D(B₊x2) ~ in4,
                    outN ~ (y + A₊x2) + (B₊x1 + B₊x2)]
-            @test eqs == get_eqs(new.system)
+            @test eqs == equations(new)
             @test new.removed_eqs == [add₊ina ~ y + A₊x2,
                                       add₊inb ~ B₊x1 + B₊x2,
                                       A₊o ~ y + A₊x2,
@@ -380,35 +381,33 @@ end
         @test isequal(equations(sys), [D(y) ~ x, 0 ~ y])
     end
    
-    @testset "set p" begin
-        @parameters t a(t) b
-        @variables x(t) y(t) z(t)
-        D = Differential(t)
 
-        blk = IOBlock([D(x) ~ 1 + D(y) + a*b], [], [])
+    @testset "transform inputs to iparams and vice versa" begin
+        using BlockSystems: make_input, make_iparam
+        @variables t out(t)
+        @parameters in(t) p
 
-        blk2 = set_p(blk, :a=>0)
-        @test equations(blk2) == [D(x) ~ 1 + D(y)]
-        blk2 = set_p(blk, blk.a=>0)
-        @test equations(blk2) == [D(x) ~ 1 + D(y)]
-        blk2 = set_p(blk, a=>0)
-        @test equations(blk2) == [D(x) ~ 1 + D(y)]
+        blkA = IOBlock([out ~ in + p], [in], [out])
 
-        blk2 = set_p(blk, :b=>1)
-        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
-        blk2 = set_p(blk, blk.b=>1)
-        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
-        blk2 = set_p(blk, b=>1)
-        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
+        @test_throws ArgumentError make_input(blkA, :in)
+        blkB1 = make_input(blkA, :p)
+        blkB2 = make_input(blkA, p)
+        blkB3 = make_input(blkA, blkA.p)
+        @test isempty(blkB1.iparams)
+        @test isempty(blkB2.iparams)
+        @test isempty(blkB3.iparams)
+        @test Set(blkB1.inputs) == Set(blkB2.inputs) == Set(blkB3.inputs)
+        @test length(blkB1.inputs) == 2
 
-        blk2 = set_p(blk, Dict(blk.a=>2, b=>4))
-        @test equations(blk2) == [D(x) ~ 9 + D(y)]
-
-        blk2 = set_p(blk, blk.a=>2, b=>4; warn=false)
-        @test equations(blk2) == [D(x) ~ 9 + D(y)]
-
-        @test_throws ArgumentError blk2 = set_p(blk, :a=>:bla)
-        @test_throws ArgumentError blk2 = set_p(blk, x=>2.0)
+        @test_throws ArgumentError make_iparam(blkA, :p)
+        blkC1 = make_iparam(blkA, :in)
+        blkC2 = make_iparam(blkA, in)
+        blkC3 = make_iparam(blkA, blkA.in)
+        @test isempty(blkC1.inputs)
+        @test isempty(blkC2.inputs)
+        @test isempty(blkC3.inputs)
+        @test Set(blkC1.iparams) == Set(blkC2.iparams) == Set(blkC3.iparams)
+        @test length(blkC1.iparams) == 2
     end
 
     @testset "simplify eqs" begin
@@ -447,5 +446,113 @@ end
         @test equations(blk2) == [o ~ 2a]
         blk2 = set_input(blk, blk.i=>a)
         @test equations(blk2) == [o ~ 2a]
+    end
+
+    @testset "direct connect" begin
+        function safe()
+            @variables t o(t) o1(t) o2(t)
+            @parameters i(t) i1(t) i2(t)
+            @named blkA = IOBlock([o1 ~ 1 + i, o2 ~ 1 - i], [i], [o1, o2])
+            @named blkB = IOBlock([o ~ 2 + i1 + 2*i2], [i1, i2], [o])
+            return blkA, blkB
+        end
+        blkA, blkB = safe()
+
+        # first we try the macro as long as those symbols are not in the namespace
+        sysA = @connect blkA.o1 => blkB.i1
+        sysB = @connect blkA.(o1, o2) => blkB.(i1, i2)
+        sysC = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false
+        sysD = @connect blkA.(o1,o2) => blkB.(i1 ,i2) autopromote=false outputs=[blkB.o]
+        sysE = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining
+        sysF = @connect blkA.(o1,o2) => blkB.(i1 ,i2) outputs=:remaining name=:foo
+
+        # create symbols in namespace
+        @variables t o(t) o1(t) o2(t)
+        @parameters i(t) i1(t) i2(t)
+
+        @test Set(sysA.outputs) == Set([o1, o2, o])
+        @test Set(sysA.inputs) == Set([i, i2])
+
+        @test Set(sysB.outputs) == Set([o1, o2, o])
+        @test Set(sysB.inputs) == Set([i])
+
+        @test Set(sysC.outputs) == Set([blkA.o1, blkA.o2, blkB.o])
+
+        @test Set(sysD.outputs) == Set([blkB.o])
+
+        @test Set(sysF.outputs) == Set([o])
+        @test Set(sysE.outputs) == Set([o])
+
+        @test sysF.name == :foo
+
+
+        @named blkC = IOBlock([o ~ π*i], [i], [o])
+        sys = @connect blkA.(o1,o2)=>blkB.(i1,i2) blkB.o=>blkC.i outputs=:remaining name=:blk autopromote=:false
+        @test sys.name == :blk
+    end
+
+    @testset "repalce_vars : combined tests for set_p and rename" begin
+        #####
+        ##### set iparam
+        #####
+        @parameters t a(t) b
+        @variables x(t) y(t) z(t)
+        D = Differential(t)
+
+        blk = IOBlock([D(x) ~ 1 + D(y) + a*b], [], [])
+
+        blk2 = replace_vars(blk, :a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y)]
+        blk2 = replace_vars(blk, blk.a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y)]
+        blk2 = replace_vars(blk, a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y)]
+
+        blk2 = replace_vars(blk, :b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
+        blk2 = replace_vars(blk, blk.b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
+        blk2 = replace_vars(blk, b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a]
+
+        blk2 = replace_vars(blk, Dict(blk.a=>2, b=>4))
+        @test equations(blk2) == [D(x) ~ 9 + D(y)]
+
+        blk2 = replace_vars(blk, blk.a=>2, b=>4; warn=false)
+        @test equations(blk2) == [D(x) ~ 9 + D(y)]
+
+        # can only set values to inputs and params
+        @test_throws ArgumentError blk2 = replace_vars(blk, x=>2.0)
+
+        #####
+        ##### set inputs
+        #####
+        @parameters t a(t) b(t)
+        @variables x(t) y(t) z(t)
+        D = Differential(t)
+
+        blk = IOBlock([D(x) ~ 1 + D(y) + a + b], [a, b], [])
+
+        blk2 = replace_vars(blk, :a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = replace_vars(blk, blk.a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+        blk2 = replace_vars(blk, a=>0)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + b]
+
+        blk2 = replace_vars(blk, :b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = replace_vars(blk, blk.b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+        blk2 = replace_vars(blk, b=>1)
+        @test equations(blk2) == [D(x) ~ 1 + D(y) + a + 1]
+
+        blk2 = replace_vars(blk, Dict(blk.a=>2, b=>4))
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        blk2 = replace_vars(blk, blk.a=>2, b=>4; warn=false)
+        @test equations(blk2) == [D(x) ~ 7 + D(y)]
+
+        @test_throws ArgumentError blk2 = replace_vars(blk, x=>2.0)
     end
 end

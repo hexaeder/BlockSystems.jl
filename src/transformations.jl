@@ -1,4 +1,5 @@
-export connect_system, rename_vars, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives, set_p, simplify_eqs, set_input
+export connect_system, remove_superfluous_states, substitute_algebraic_states, substitute_derivatives
+export simplify_eqs, set_input, make_input, make_iparam, replace_vars
 
 """
 $(SIGNATURES)
@@ -24,7 +25,7 @@ function connect_system(ios::IOSystem;
                         remove_superflous_states=false,
                         substitute_algebraic_states=true,
                         substitute_derivatives=true,
-                        warn=true)
+                        warn=WARN[])
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
         if subsys isa IOSystem
@@ -89,7 +90,7 @@ end
 
 
 """
-    remove_superfluous_states(iob::IOBlock; verbose=false, warn=true)
+    remove_superfluous_states(iob::IOBlock; verbose=false, warn=WARN[])
 
 This function removes equations from block, which are not used in order to
 generate the outputs. It looks for equations which have no path to the outputs
@@ -99,7 +100,7 @@ The removed equations will be not available as removed equations of the new IOBl
 
 TODO: Maybe we should try to reduce the inputs to.
 """
-function remove_superfluous_states(iob::IOBlock; verbose=false, warn=true)
+function remove_superfluous_states(iob::IOBlock; verbose=false, warn=WARN[])
     iv = get_iv(iob)
     outputs = iob.outputs
 
@@ -134,14 +135,14 @@ end
 
 
 """
-    substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
+    substitute_algebraic_states(iob::IOBlock; verbose=false, warn=WARN[])
 
 Reduces the number of equations by substituting explicit algebraic equations.
 Returns a new IOBlock with the reduced equations. The removed eqs are stored
 together with the previous `removed_eqs` in the new IOBlock.
 Won't reduce algebraic states which are labeled as `output`.
 """
-function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=true)
+function substitute_algebraic_states(iob::IOBlock; verbose=false, warn=WARN[])
     reduced_eqs = deepcopy(equations(iob))
 
     (rules, removable) = _algebraic_substitution_rules(reduced_eqs; skip=Set(iob.outputs))
@@ -193,7 +194,7 @@ end
 
 
 """
-    substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
+    substitute_derivatives(iob::IOBlock; verbose=false, warn=WARN[])
 
 Expand all derivatives in the RHS of the system. Try to substitute
 in the lhs with their definition.
@@ -209,7 +210,7 @@ Process happens in multiple steps:
 - expand derivatives and try again to substitute with known differentials
 
 """
-function substitute_derivatives(iob::IOBlock; verbose=false, warn=true)
+function substitute_derivatives(iob::IOBlock; verbose=false, warn=WARN[])
     diffs = rhs_differentials(iob)
 
     # if there are none just return the old block
@@ -268,11 +269,11 @@ end
 
 
 """
-    simplify_eqs(iob::IOBlock; verbose=false, warn=true)
+    simplify_eqs(iob::IOBlock; verbose=false, warn=WARN[])
 
 Simplify eqs and removed eqs and return new IOBlock.
 """
-function simplify_eqs(iob::IOBlock; verbose=false, warn=true, hotfix=true)
+function simplify_eqs(iob::IOBlock; verbose=false, warn=WARN[], hotfix=true)
     verbose && @info "Simplify iob equations..."
     simplified_eqs = simplify.(equations(iob))
     simplified_rem_eqs = simplify.(iob.removed_eqs)
@@ -281,80 +282,71 @@ function simplify_eqs(iob::IOBlock; verbose=false, warn=true, hotfix=true)
     if hotfix
         missing_metadata1 = check_metadata(simplified_eqs)
         if !isempty(missing_metadata1)
-            warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
+            warn && WARN_SIMPLIFY[] && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
             simplified_eqs = equations(iob)
         end
         missing_metadata2 = check_metadata(simplified_rem_eqs)
         if !isempty(missing_metadata2)
-            warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
+            warn && WARN_SIMPLIFY[] && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
             simplified_rem_eqs = iob.removed_eqs
         end
     end
-
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 
-
 """
-    rename_vars(blk::IOBLock; warn=true, kwargs...)
-    rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
+    replace_vars(blk::IOBlock, p::Dict; warn=WARN[])
+    replace_vars(blk::IOBlock, p::Pair; warn=WARN[])
+    replace_vars(blk::IOBlock; warn=WARN[], v1=val1, v2=val2)
 
-Returns new IOBlock which is similar to blk but with new variable names.
-Variable renaming should be provided as keyword arguments, i.e.
-
-    rename_vars(blk; x=:newx, k=:knew)
-
-to rename `x(t)=>newx(t)` and `k=>knew`. Substitutions can be also provided as
-dict of `Symbolic` types (`Sym`s and `Term`s).
-"""
-function rename_vars(blk::IOBlock; warn=true, kwargs...)
-    substitutions = Dict{Symbolic, Symbolic}()
-    for pair in kwargs
-        key = remove_namespace(blk.name, getproperty(blk, pair.first))
-        val = rename(key, pair.second)
-        substitutions[key] = val
-    end
-    rename_vars(blk, substitutions; warn)
-end
-
-function rename_vars(blk::IOBlock, subs::Dict{Symbolic,Symbolic}; warn=true)
-    eqs     = map(eq->eqsubstitute(eq, subs), get_eqs(blk.system))
-    rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    inputs  = map(x->substitute(x, subs), blk.inputs)
-    outputs = map(x->substitute(x, subs), blk.outputs)
-    IOBlock(blk.name, eqs, inputs, outputs, rem_eqs; iv=get_iv(blk), warn)
-end
-
-
-"""
-    set_p(blk::IOBlock, p::Dict; warn=true)
-    set_p(blk::IOBlock, p::Pair; warn=true)
-
-Substitutes certain parameters by actual Float values. Returns an IOBlock without those parameters.
+Replace variables, either rename them by giving a new `Symbol` or replace them by actual numerical values
+(only possible for inputs and iparams). Returns new `IOBlock`.
 
 Keys of dict can be either `Symbols` or the `Symbolic` subtypes. I.e. `blk.u => 1.0` is as valid as `:u => 1.0`.
+
+    replace_vars(blk; π = 3.14, foo = :bar) # set blk.π to number and rename foo
+    replace_vars(blk, Dict(:π => 3.14, :foo = :bar))
+    replace_vars(blk, blk.π => 3.14)
 """
-function set_p(blk::IOBlock, p::Dict; warn=true)
-    subs = Dict{Symbolic, Float64}()
-    validp = Set(blk.iparams)
-    for k in keys(p)
+replace_vars(blk::IOBlock, s...; warn=WARN[]) = length(s) > 1 ? replace_vars(blk, Dict(s); warn) : replace_vars(blk, Dict(only(s)); warn)
+replace_vars(blk::IOBlock; warn=WARN[], kwargs...) = replace_vars(blk, Dict(kwargs); warn)
+function replace_vars(blk::IOBlock, dict::Dict; warn=WARN[])
+    subs = Dict{Symbolic, Any}()
+    validp  = Set(blk.iparams)
+    validin = Set(blk.inputs)
+    closedinputs = Set()
+    for (k,v) in dict
         try
             sym = getproperty(blk, k)
         catch
-            warn && @warn "Symbol $k not present in block. Skipped."
+            warn && @warn "Symbol :$k not present in block. Skipped."
             continue
         end
         sym = remove_namespace(blk.name, sym)
-        @check sym ∈ validp "Symbol $sym is not iparam of block"
-        @check p[k] isa Number "p value has to be a number! Maybe you are looking for `rename_vars` instead?"
-        subs[sym] = p[k]
+
+        if v isa Number
+            # replace path
+            if sym ∈ validin
+                push!(closedinputs, sym)
+            else
+                @check sym ∈ validp "Symbol $sym is neither iparam nor input of block. Can not repalace with number."
+            end
+            subs[sym] = dict[k]
+        elseif v isa Symbol || v isa Symbolic
+            # rename path
+            val = rename(sym, v)
+            subs[sym] = val
+        end
     end
     eqs     = map(eq->eqsubstitute(eq, subs), equations(blk))
     rem_eqs = map(eq->eqsubstitute(eq, subs), blk.removed_eqs)
-    IOBlock(blk.name, eqs, blk.inputs, blk.outputs, rem_eqs; iv=get_iv(blk), warn)
-end
 
-set_p(blk::IOBlock, p...; warn=true) = length(p) > 1 ? set_p(blk, Dict(p); warn) : set_p(blk, Dict(only(p)); warn)
+    newinputs = setdiff(blk.inputs, closedinputs)      # kick substitutions by number out
+    newinputs = map(x->substitute(x, subs), newinputs) # replace new names
+    newoutputs = map(x->substitute(x, subs), blk.outputs)
+
+    IOBlock(blk.name, eqs, newinputs, newoutputs, rem_eqs; iv=get_iv(blk), warn)
+end
 
 """
     set_input(blk::IOBlock, p::Pair; verbose=false)
@@ -376,4 +368,45 @@ function set_input(blk::IOBlock, p::Pair; verbose=false)
                     [tmpblk, blk];
                    outputs=namespace_outputs(blk), name=blk.name)
     return connect_system(sys; verbose)
+end
+
+"""
+    make_input(blk::IOBlock, sym; warn=WARN[])
+
+Change given sym from iparam to input.
+"""
+function make_input(blk::IOBlock, sym; warn=WARN[])
+    var_nspcd = getproperty(blk, sym)
+    var = remove_namespace(blk.name, var_nspcd)
+    @check var ∈ Set(blk.iparams) "$sym is not an iparam of block."
+
+    varname = getname(var)
+    iv = get_iv(blk)
+    tmp, = @parameters $varname(iv)
+
+    sub = var => tmp
+    eqs     = map(eq->eqsubstitute(eq, sub), equations(blk))
+    rem_eqs = map(eq->eqsubstitute(eq, sub), blk.removed_eqs)
+
+    IOBlock(blk.name, eqs, vcat(blk.inputs,tmp), blk.outputs, rem_eqs; iv, warn)
+end
+
+"""
+    make_iparam(blk::IOBlock, sym; warn=WARN[])
+
+Change given sym from input to iparam.
+"""
+function make_iparam(blk::IOBlock, sym; warn=WARN[])
+    var_nspcd = getproperty(blk, sym)
+    var = remove_namespace(blk.name, var_nspcd)
+    @check var ∈ Set(blk.inputs) "$sym is not an input of block."
+
+    varname = getname(var)
+    iv = get_iv(blk)
+    tmp, = @parameters $varname
+    sub = var => tmp
+    eqs     = map(eq->eqsubstitute(eq, sub), equations(blk))
+    rem_eqs = map(eq->eqsubstitute(eq, sub), blk.removed_eqs)
+
+    IOBlock(blk.name, eqs, filter(!isequal(var), blk.inputs), blk.outputs, rem_eqs; iv, warn)
 end
