@@ -18,6 +18,7 @@ using SnoopPrecompile
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
 const WARN=Ref(true)
+const WARN_SIMPLIFY=Ref(true)
 
 include("utils.jl")
 
@@ -505,6 +506,7 @@ include("algebraic_elimination.jl")
 include("transformations.jl")
 include("function_generation.jl")
 include("visualization.jl")
+include("deprecated.jl")
 
 @precompile_all_calls begin
     @parameters t i1(t) i2(t) a b ina(t) inb(t)
