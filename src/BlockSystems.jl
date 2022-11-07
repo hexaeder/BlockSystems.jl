@@ -18,6 +18,7 @@ using SnoopPrecompile
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
 const WARN=Ref(true)
+const WARN_SIMPLIFY=Ref(true)
 
 include("utils.jl")
 

@@ -282,16 +282,15 @@ function simplify_eqs(iob::IOBlock; verbose=false, warn=WARN[], hotfix=true)
     if hotfix
         missing_metadata1 = check_metadata(simplified_eqs)
         if !isempty(missing_metadata1)
-            warn && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
+            warn && WARN_SIMPLIFY[] && @warn "Simplification of equations of $(iob.name) lead to missing metadata of $missing_metadata1. Skip!"
             simplified_eqs = equations(iob)
         end
         missing_metadata2 = check_metadata(simplified_rem_eqs)
         if !isempty(missing_metadata2)
-            warn && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
+            warn && WARN_SIMPLIFY[] && @warn "Simplification of removed equations of $(iob.name) lead to missing metadata of $missing_metadata2. Skip!"
             simplified_rem_eqs = iob.removed_eqs
         end
     end
-
     IOBlock(iob.name, simplified_eqs, iob.inputs, iob.outputs, simplified_rem_eqs; iv=get_iv(iob), warn)
 end
 

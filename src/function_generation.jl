@@ -82,7 +82,7 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
         #     warnstr *= "f_rem_states, "
         # end
         if incomplete
-            @warn "The ordering of the states might change in future versions. Therefore it is highly recommend to provide all variables in the f_* arguments. There are missing entrys in " * warnstr[begin:end-2] * " are missing some entrys!"
+            @warn "The ordering of the states might change in future versions. Therefore it is highly recommend to provide all variables in the f_* arguments. There are missing entrys in " * warnstr[begin:end-2] * "."
         end
     end
 
