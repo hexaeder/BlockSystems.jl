@@ -156,8 +156,8 @@ D = Differential(t)
 iob = IOBlock([D(x) ~ i, o ~ x], [i], [o], name=:iob)
 ```
 """
-function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name = gensym(:IOBlock), iv = nothing, warn=WARN[])
-    IOBlock(name, eqs, inputs, outputs, Equation[]; iv, warn)
+function IOBlock(eqs::Vector{<:Equation}, inputs, outputs; name=gensym(:IOBlock), iv=nothing, warn=WARN[], rem_eqs=Equation[])
+    IOBlock(name, eqs, inputs, outputs, rem_eqs; iv, warn)
 end
 
 function IOBlock(name, eqs, inputs, outputs, rem_eqs; iv=nothing, warn=WARN[])
