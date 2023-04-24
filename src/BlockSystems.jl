@@ -13,7 +13,7 @@ using ModelingToolkit.SymbolicUtils: Symbolic, operation, arguments, istree
 using Symbolics: tosymbol
 using SciMLBase
 using Graphs
-using SnoopPrecompile
+using PrecompileTools
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
@@ -508,7 +508,7 @@ include("function_generation.jl")
 include("visualization.jl")
 include("deprecated.jl")
 
-@precompile_all_calls begin
+@compile_workload begin
     @parameters t i1(t) i2(t) a b ina(t) inb(t)
     @variables x1(t) x2(t) o(t) add(t)
 
