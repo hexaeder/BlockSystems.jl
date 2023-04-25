@@ -14,7 +14,7 @@ Recursively transform `IOSystems` to `IOBlocks`.
 Arguments:
 - `ios`: system to connect
 - `verbose=false`: toggle verbosity (show equations at different steps)
-- `remove_superflous_states=true`: toggle whether the system should try to get rid of unused states
+- `remove_superflous_states=false`: toggle whether the system should try to get rid of unused states
 - `substitute_algebraic_states=true`: toggle whether the algorithm tries to get rid of explicit algebraic equations
 - `substitute_derivatives=true`: toggle whether to expand all derivatives and try to substitute them
 - `simplify_eqs=true`: toggle simplification of all equations at the end
@@ -317,7 +317,8 @@ function replace_vars(blk::IOBlock, dict::Dict; warn=WARN[])
     closedinputs = Set()
     for (k,v) in dict
         try
-            sym = getproperty(blk, k)
+            ki = remove_namespace(blk.name, k)
+            sym = getproperty(blk, ki)
         catch
             warn && @warn "Symbol :$k not present in block. Skipped."
             continue
@@ -409,4 +410,16 @@ function make_iparam(blk::IOBlock, sym; warn=WARN[])
     rem_eqs = map(eq->eqsubstitute(eq, sub), blk.removed_eqs)
 
     IOBlock(blk.name, eqs, filter(!isequal(var), blk.inputs), blk.outputs, rem_eqs; iv, warn)
+end
+
+export make_istate
+"""
+"""
+function make_istate(blk::IOBlock, sym; warn=WARN[])
+    blk = deepcopy(blk)
+    var_nspcd = getproperty(blk, sym)
+    var = remove_namespace(blk.name, var_nspcd)
+    @check var ∈ Set(blk.outputs) "$sym is not an output of block."
+
+    IOBlock(blk.name, equations(blk), blk.inputs, filter(!isequal(var), blk.outputs), blk.removed_eqs; iv=get_iv(blk), warn)
 end

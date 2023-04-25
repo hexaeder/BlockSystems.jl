@@ -19,10 +19,10 @@ DocStringExtensions = "0.7, 0.8, 0.9"
 Graphs = "1.4"
 ModelingToolkit = "7, 8"
 Reexport = "1"
-SciMLBase = "1"
 PrecompileTools = "1"
-SymbolicUtils = "0.18, 0.19"
-Symbolics = "4.3"
+SciMLBase = "1"
+SymbolicUtils = "1"
+Symbolics = "5"
 julia = "1.6"
 
 [extras]

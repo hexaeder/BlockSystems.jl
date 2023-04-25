@@ -17,6 +17,7 @@ optional:
 - `f_rem_states`: define removed states algebraic state order
 - `expression=Val{false}`: toggle expression and callable function output
 - `warn=WARN[]`: toggle warnings for missing `f_*` parameters
+- `observed=false`: toggle creation ob "observed" function
 
 Returns an named tuple with the fields
 - for `type=:ode`:
@@ -33,10 +34,11 @@ Returns an named tuple with the fields
 - `rem_states` symbols of removed states (in order)
 - `g_ip`, `g_oop` functions `g((opt. out), states, inputs, params, iv)` to calculate the
   removed states (substituted expl. algebraic equations). `nothing` if empty.
+- `obsf`: Only if `observed=true`. Function in the SciML "observed" style `(sym, u, p, t)`
 """
 function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [],
                               f_params = [], f_rem_states = [],
-                              expression = Val{false}, verbose=false, type=:auto, warn=WARN[])
+                              expression = Val{false}, verbose=false, type=:auto, observed=false, warn=WARN[])
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
@@ -132,12 +134,25 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     # generate functions for removed states
     if isempty(rem_states)
         g_oop = nothing; g_ip = nothing
+        obsf = nothing
     else
         rem_eqs = reorder_by_states(ios.removed_eqs, rem_states)
         verbose && @info "Reordered removed eqs" rem_eqs rem_states
 
         rem_formulas = [substitute(eq.rhs, sub) for eq in rem_eqs]
         g_oop, g_ip = build_function(rem_formulas, state_syms, input_syms, param_syms, get_iv(ios); expression = expression)
+
+        if observed
+            @check isempty(input_syms) "Cannot create `observed` function if there are open inputs."
+            obsdict = Dict{Symbol, Function}()
+            for (idx, state) in pairs(rem_states)
+                obs_oop, _  = build_function(rem_formulas[[idx]], state_syms, input_syms, param_syms, get_iv(ios); expression)
+                obsdict[getname(state)] = obs_oop
+                obsf = (sym, u, p, t) -> only(obsdict[sym](u, nothing, p, t))
+            end
+        else
+            obsf = nothing
+        end
     end
 
     return (f_oop=f_oop, f_ip=f_ip,
@@ -146,7 +161,8 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
             inputs=input_syms,
             params=param_syms,
             g_oop=g_oop, g_ip=g_ip,
-            rem_states=rem_state_syms)
+            rem_states=rem_state_syms,
+            obsf)
 end
 
 """
@@ -156,13 +172,14 @@ Return an `ODEFunction` object with the corresponding mass matrix and variable n
 """
 function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=WARN[])
     @check isempty(iob.inputs) "all inputs must be closed"
-    gen = generate_io_function(iob; f_states, f_params, verbose, warn);
-    observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
+    gen = generate_io_function(iob; f_states, f_params, verbose, warn, observed=true);
+
+    # observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
     ODEFunction((du,u,p,t) -> gen.f_ip(du,u,nothing,p,t);
                 mass_matrix = gen.massm,
                 syms=Symbol.(gen.states),
                 indepsym=get_iv(iob),
-                observed)
+                observed=gen.obsf)
 end
 
 """
