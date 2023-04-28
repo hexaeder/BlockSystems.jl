@@ -509,6 +509,7 @@ include("visualization.jl")
 include("deprecated.jl")
 
 @compile_workload begin
+    BlockSystems.WARN[] = false
     @parameters t i1(t) i2(t) a b ina(t) inb(t)
     @variables x1(t) x2(t) o(t) add(t)
 
@@ -575,6 +576,7 @@ include("deprecated.jl")
     generate_io_function(con);
     generate_io_function(con1);
     generate_io_function(con2);
+    BlockSystems.WARN[] = true
 end
 
 end # module

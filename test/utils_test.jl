@@ -60,6 +60,18 @@ using ModelingToolkit.SymbolicUtils: operation
         @test isequal(remove_namespace(a), a)
         @test isequal(remove_namespace(bn), b)
         @test isequal(remove_namespace(b), b)
+
+        @variables t x y(t) foo₊x foo₊y(t)
+        @test isequal(remove_namespace(t), t)
+        @test isequal(remove_namespace(x), x)
+        @test isequal(remove_namespace(y), y)
+        @test isequal(remove_namespace(foo₊x), x)
+        @test isequal(remove_namespace(foo₊y), y)
+        @test isequal(remove_namespace(:foo, t), t)
+        @test isequal(remove_namespace(:foo, x), x)
+        @test isequal(remove_namespace(:foo, y), y)
+        @test isequal(remove_namespace(:foo, foo₊x), x)
+        @test isequal(remove_namespace(:foo, foo₊y), y)
     end
 
     @testset "eqsubstitute" begin

@@ -101,7 +101,7 @@ end
         @test equations(reqs) == [D(x) ~ i,
                           D(y) ~ i,]
         @test reqs.removed_eqs == [o2 ~ y + 2*(-x + -y),
-                                   o1 ~ -x + -y]
+                                   o1 ~ 2*(-x + -y) + x + y]
 
         # TODO: multiple applications should not remove more equations!
         rreqs = substitute_algebraic_states(reqs)
@@ -416,13 +416,13 @@ end
         D = Differential(t)
         blk = IOBlock([D(x) ~ x/a], [], [])
 
-        # this errors on MTK@0.8 currently
-        ModelingToolkit.namespace_equations(simplify_eqs(blk).system)
+        eqs = ModelingToolkit.namespace_equations(simplify_eqs(blk; hotfix=false).system)
+        @test_broken isempty(BlockSystems.check_metadata(eqs))
 
         @variables a(t) b(t) c(t) d(t)
         term = substitute(a - b, b=>c + d) |> Symbolics.unwrap
         terms = simplify(term)
-        @test_broken !any(Symbolics.metadata.(Symbolics.get_variables(terms)).==nothing)
+        @test !any(Symbolics.metadata.(Symbolics.get_variables(terms)).==nothing)
     end
 
     @testset "set input" begin

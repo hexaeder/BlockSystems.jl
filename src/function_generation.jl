@@ -114,10 +114,10 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     end
 
     # substitute x(t) by x for all terms
-    state_syms = strip_iv(states, get_iv(ios))
-    input_syms = strip_iv(inputs, get_iv(ios))
-    param_syms = strip_iv(params, get_iv(ios))
-    rem_state_syms = strip_iv(rem_states, get_iv(ios))
+    state_syms = strip_iv.(states, get_iv(ios))
+    input_syms = strip_iv.(inputs, get_iv(ios))
+    param_syms = strip_iv.(params, get_iv(ios))
+    rem_state_syms = strip_iv.(rem_states, get_iv(ios))
 
     sub = merge(Dict(states .=> state_syms),
                 Dict(inputs .=> input_syms),
@@ -188,7 +188,7 @@ end
 Strip functional dependency of the independent variable `x(iv) -> x`.
 """
 function strip_iv(x::Symbolic, iv::Symbolic)
-    if istree(x) && operation(x) isa Sym
+    if istree(x) && operation(x) isa Symbolic
         if (length(arguments(x)) != 1 || !isequal(arguments(x)[1], iv))
             error("Don't knowhow to handle expression $x")
         end
@@ -198,7 +198,6 @@ function strip_iv(x::Symbolic, iv::Symbolic)
     end
 end
 strip_iv(x::Num, iv::Num) = Num(strip_iv(value(x), value(iv)))
-strip_iv(xv::Vector, iv) = map(x->strip_iv(x, iv), xv)
 
 """
     prepare_f_vector(iob, vector)
@@ -221,7 +220,7 @@ end
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
     for (i, eq) in enumerate(eqs)
-        if eq.lhs isa Term && operation(eq.lhs) isa Differential
+        if istree(eq.lhs) && operation(eq.lhs) isa Differential
             continue
         end
         eqs[i] = 0 ~ eq.rhs - eq.lhs
@@ -247,7 +246,7 @@ end
 function generate_massmatrix(eqs::AbstractVector{Equation})
     V = Vector{Int}(undef, length(eqs))
     for i in 1:length(eqs)
-        if eqs[i].lhs isa Term && operation(eqs[i].lhs) isa Differential
+        if istree(eqs[i].lhs) && operation(eqs[i].lhs) isa Differential
             V[i] = 1
         elseif isequal(eqs[i].lhs, 0)
             V[i] = 0
