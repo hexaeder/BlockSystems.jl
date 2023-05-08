@@ -299,15 +299,23 @@ function IOSystem(cons,
             newoutputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
             # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
             for (i, o) in enumerate(newoutputs)
-                if o ∉ Set(nspcd_outputs)
-                    if o isa Symbol
-                        key = findfirst(v->isequal(getname(v), o), namespace_map)
+                if o isa Symbol
+                    # check in nspcd_outputs the check in namespace_map
+                    if (index = findfirst(v->isequal(getname(v), o), nspcd_outputs)) !== nothing
+                        newoutputs[i] = nspcd_outputs[index]
+                    elseif (key = findfirst(v->isequal(getname(v), o), namespace_map)) !== nothing
+                        newoutputs[i] = key
                     else
-                        key = findfirst(v->isequal(v, o), namespace_map)
+                        throw(ArgumentError("Output Symbol $o neither found in namespaced outputs nor namespace_map"))
                     end
-                    # check if key references a output (namespace_map contains all)
-                    key ∉ Set(nspcd_outputs) && throw(ArgumentError("Output $o ∉ outputs ∪ outputs_promoted"))
-                    newoutputs[i] = key
+                else
+                    if (index = findfirst(v->isequal(v, o), nspcd_outputs)) !== nothing
+                        newoutputs[i] = nspcd_outputs[index]
+                    elseif (key = findfirst(v->isequal(v, o), namespace_map)) !== nothing
+                        newoutputs[i] = key
+                    else
+                        throw(ArgumentError("Output Symbolic $o neither found in namespaced outputs nor namespace_map"))
+                    end
                 end
             end
             former_outputs = setdiff(nspcd_outputs, newoutputs)
