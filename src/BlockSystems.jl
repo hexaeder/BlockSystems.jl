@@ -261,7 +261,8 @@ function IOSystem(cons,
                   name = gensym(:IOSystem),
                   autopromote = true)
     namespaces = [sys.name for sys in io_systems]
-    allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
+    allunique(namespaces) || throw(ArgumentError("Some Subsystem names are not unique!"))
+    name ∉ namespaces || throw(ArgumentError("Composite system has same name as one of the subsystems $(name)!"))
 
     ivs = unique([get_iv(sys) for sys in io_systems])
     length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
