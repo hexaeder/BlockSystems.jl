@@ -127,4 +127,3 @@ plot(sol, vars=(0,[ 1,2 ]), label=["altitude" "integrator"], title="PT1 controll
 plot!(t->targetfun(t),tspan..., label="target")
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
-
