@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Kuramoto without ND.jl · BlockSystems.jl</title><meta name="title" content="Kuramoto without ND.jl · BlockSystems.jl"/><meta property="og:title" content="Kuramoto without ND.jl · BlockSystems.jl"/><meta property="twitter:title" content="Kuramoto without ND.jl · BlockSystems.jl"/><meta name="description" content="Documentation for BlockSystems.jl."/><meta property="og:description" content="Documentation for BlockSystems.jl."/><meta property="twitter:description" content="Documentation for BlockSystems.jl."/><meta property="og:url" content="https://hexaeder.github.io/BlockSystems.jl/generated/kuramoto_without_nd/"/><meta property="twitter:url" content="https://hexaeder.github.io/BlockSystems.jl/generated/kuramoto_without_nd/"/><link rel="canonical" href="https://hexaeder.github.io/BlockSystems.jl/generated/kuramoto_without_nd/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">BlockSystems.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../spacecraft/">Spacecraft</a></li><li><a class="tocitem" href="../kuramoto_network/">Kuramoto Network</a></li><li class="is-active"><a class="tocitem" href>Kuramoto without ND.jl</a><ul class="internal"><li><a class="tocitem" href="#Network-Dynamics-without-NetworkDynamics.jl"><span>Network Dynamics without NetworkDynamics.jl</span></a></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Kuramoto without ND.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Kuramoto without ND.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/hexaeder/BlockSystems.jl/blob/main/examples/kuramoto_without_nd.jl#L" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h2 id="Network-Dynamics-without-NetworkDynamics.jl"><a class="docs-heading-anchor" href="#Network-Dynamics-without-NetworkDynamics.jl">Network Dynamics without NetworkDynamics.jl</a><a id="Network-Dynamics-without-NetworkDynamics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Network-Dynamics-without-NetworkDynamics.jl" title="Permalink"></a></h2><p>In this example we model a Kuramoto system on a complex network.</p><pre><code class="language-julia hljs">using Graphs
+using BlockSystems
+using ModelingToolkit
+using OrdinaryDiffEq
+using Plots</code></pre><p>Dynamical systems on complex networks are best modelled on directed graphs, because in general an interaction of node i and j may be asymmetric, e.g. when node i influences node j but not vice versa.</p><p>Symmetries of the system such as (anti-)symmetric coupling functions may justify other approaches, but those are of limited scope, for a detailed discussion see <a href="https://arxiv.org/abs/2012.12696">our paper</a>, Section II.D.</p><p>In the following each edge is represented by a function:</p><pre><code class="nohighlight hljs">     e₁₂ = f(1,2)
+     .---&gt;---.
+   (1)       (2)
+     ˙---&lt;---˙
+     e₂₁ = f(2,1)</code></pre><p>Each edge function sees the values of the connected nodes, its source and its destination. Nodes are modeled as functions as well and see all their <em>incoming</em> edges.</p><p>The goal is to generate IOBlocks for edges and vertices based on a given graph.</p><p>While defining the edge block is straightforward, we have to make the vertex blocks a bit special: since MTK does not support vector inputs yet we need a special IOBlock which depends on the number of connected edges.</p><pre><code class="language-julia hljs">function gen_edge_block(name)
+    @parameters t src(t) dst(t) K
+    @variables out(t)
+    IOBlock([out ~ K*sin(src-dst)], [src, dst], [out], name=Symbol(name))
+end
+
+# append subscript, `sybscript(:foo, 2) =&gt; :foo₂`
+subscript(s, i) = Symbol(s, Char(0x02080 + i))
+
+function gen_vertex_block(n_edges, name)
+    @parameters t ω
+    @variables ϕ(t)
+    D = Differential(t)
+    # the way array variables work changed. This is a hack to retrieve the old behavior of
+    # this closely mimics the old @parameters edge[1:n_edges](t)
+    edge = Num[]
+    for i in 1:n_edges
+        symname = subscript(:edge, i)
+        append!(edge, @parameters $symname(t))
+    end
+
+    IOBlock([D(ϕ) ~ ω + (+)(edge...)],
+            [edge...],
+            [ϕ],
+            name=Symbol(name))
+end</code></pre><p>For simplicity our graph will be a simple ring network specified with Graphs.jl</p><pre><code class="language-julia hljs">N = 8
+g = SimpleDiGraph(watts_strogatz(N,2,0)) # ring network</code></pre><p>First we generate a list of all edge-blocks because they don&#39;t depend on the vertices.</p><pre><code class="language-julia hljs">edgelist = [(i=i, src=e.src, dst=e.dst, block=gen_edge_block(&quot;e_$(e.src)_$(e.dst)&quot;))
+            for (i, e) in enumerate(edges(g))]
+edge_blocks = [e.block for e in edgelist]</code></pre><p>Now we can generate vertex blocks based on their number of incoming edges. We will also create the connections</p><pre><code class="nohighlight hljs">e_i_k.out =&gt; node.edge₁
+e_j_k.out =&gt; node.edge₂
+...</code></pre><p>for all edges that go from vertices i or j to vertex k.</p><pre><code class="language-julia hljs">vert_blocks = IOBlock[]
+connections = Pair[]
+
+for i in vertices(g)
+    # collect the incoming edges for each node
+    edges = filter(e -&gt; e.dst == i, edgelist)
+
+    node = gen_vertex_block(length(edges), &quot;v$i&quot;)
+    push!(vert_blocks, node)
+
+    # each node has the open inputs edge₁, edge₂, ...
+    # we need to connect the outputs of the edge-blocks to the
+    # inputs of the node like edge_j_to_1.out =&gt; node.edge₁
+    for (i, edge) in enumerate(edges)
+        node_input_i = getproperty(node, subscript(:edge, i))
+        push!(connections, edge.block.out =&gt; node_input_i)
+    end
+end</code></pre><p>Once the vertices are generated we can plug the edges&#39; src and dst to the output of the # corresponding vertex, in this case its the oscillators angle ϕ</p><pre><code class="language-julia hljs">for edge in edgelist
+    push!(connections, vert_blocks[edge.src].ϕ =&gt; edge.block.src)
+    push!(connections, vert_blocks[edge.dst].ϕ =&gt; edge.block.dst)
+end</code></pre><p>We want the <code>connect_system</code> to get rid of the algebraic states for the edges. Therefore we have to provide a list of <code>outputs</code> which only contains the outputs of the vertices. By doing so the edge outputs will become internal <code>istates</code> of the <code>IOSystem</code> and upon connection may be reduced.</p><pre><code class="language-julia hljs">outputs = [block.ϕ for block in vert_blocks]
+
+network = IOSystem(connections, vcat(vert_blocks, edge_blocks), outputs=outputs)
+
+networkblock = connect_system(network, verbose=false)</code></pre><p>As the output shows the system has be reduced to just N equations. Well now we can generate the functions...</p><pre><code class="language-julia hljs">gen = generate_io_function(networkblock,
+                           f_states=[v.ϕ for v in vert_blocks],
+                           f_params=vcat([v.ω for v in vert_blocks],
+                                         [e.K for e in edge_blocks]),
+                           warn=false);</code></pre><p>... enclose the <code>f_ip</code> to get rid of the empty <code>inputs</code> field...</p><pre><code class="language-julia hljs">odefun(du, u, p, t) = gen.f_ip(du, u, (), p, t)</code></pre><p>... set the starting conditions ...</p><pre><code class="language-julia hljs">ω = collect(1:N)./N
+ω .-= sum(ω)/N
+K = [3.0 for i in edge_blocks]
+p = (ω..., K...)
+
+x0 = collect(1:N)./N
+x0 .-= sum(x0)./N</code></pre><p>... and solve the system!</p><pre><code class="language-julia hljs">tspan = (0., 10.)
+prob = ODEProblem(odefun, x0, tspan, p)
+sol = solve(prob, Tsit5())
+plot(sol, ylabel=&quot;ϕ&quot;)</code></pre><img src="f09fb50b.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../kuramoto_network/">« Kuramoto Network</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Wednesday 17 January 2024 15:40">Wednesday 17 January 2024</span>. Using Julia version 1.10.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
