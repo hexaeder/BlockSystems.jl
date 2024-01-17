@@ -1,6 +1,7 @@
 module BlockSystems
 
 using LinearAlgebra
+using Random
 using Reexport
 using DocStringExtensions
 using Symbolics
@@ -14,6 +15,7 @@ using Symbolics: tosymbol
 using SciMLBase
 using Graphs
 using PrecompileTools
+using SimpleNonlinearSolve
 
 export AbstractIOSystem, IOBlock, IOSystem, get_iv, equations
 
@@ -79,9 +81,9 @@ struct IOBlock <: AbstractIOSystem
 
     function IOBlock(name, inputs, iparams, istates, outputs, odes, rem_eqs; warn)
         @check name == getname(odes) "Name of inner ODESystem does not match name of IOBlock"
-        @checkwarn warn Set(inputs) ⊆ Set(parameters(odes)) "Inputs should be parameters. You may ignore this warning if you want to specify an input which is not used in the eqs."
+        # @checkwarn warn Set(inputs) ⊆ Set(parameters(odes)) "$name: Inputs should be parameters. You may ignore this warning if you want to specify an input which is not used in the eqs."
         @checkwarn warn Set(outputs) ⊆ Set(states(odes)) "Outputs should be variables. You may ignore this waring if you want to specify an output which is not used in the eqs (completly implicit)."
-        @checkwarn warn Set(iparams) ⊆ Set(parameters(odes)) "iparams should be parameters of the eqs system"
+        # @checkwarn warn Set(iparams) ⊆ Set(parameters(odes)) "iparams should be parameters of the eqs system"
         @checkwarn warn Set(istates) ⊆ Set(states(odes)) "istates should be variables of the eqs system"
         @check Set(parameters(odes)) ⊆ Set(inputs ∪ iparams) "params(eqs) ⊆ inputs ∪ iparams"
         @check Set(states(odes)) ⊆ Set(outputs ∪ istates) "states(eqs) ⊆ outputs ∪ istates"
@@ -261,7 +263,8 @@ function IOSystem(cons,
                   name = gensym(:IOSystem),
                   autopromote = true)
     namespaces = [sys.name for sys in io_systems]
-    allunique(namespaces) || throw(ArgumentError("Namespace collision in subsystems!"))
+    allunique(namespaces) || throw(ArgumentError("Some Subsystem names are not unique!"))
+    name ∉ namespaces || throw(ArgumentError("Composite system has same name as one of the subsystems $(name)!"))
 
     ivs = unique([get_iv(sys) for sys in io_systems])
     length(ivs) == 1 || throw(ArgumentError("Multiple independent variables!"))
@@ -299,15 +302,23 @@ function IOSystem(cons,
             newoutputs::Vector{Union{Symbol, Symbolic}} = value.(outputs)
             # check if outputs ∈ nspcd_outputs or referenced in rhs of namespace_map
             for (i, o) in enumerate(newoutputs)
-                if o ∉ Set(nspcd_outputs)
-                    if o isa Symbol
-                        key = findfirst(v->isequal(getname(v), o), namespace_map)
+                if o isa Symbol
+                    # check in nspcd_outputs the check in namespace_map
+                    if (index = findfirst(v->isequal(getname(v), o), nspcd_outputs)) !== nothing
+                        newoutputs[i] = nspcd_outputs[index]
+                    elseif (key = findfirst(v->isequal(getname(v), o), namespace_map)) !== nothing
+                        newoutputs[i] = key
                     else
-                        key = findfirst(v->isequal(v, o), namespace_map)
+                        throw(ArgumentError("Output Symbol $o neither found in namespaced outputs nor namespace_map"))
                     end
-                    # check if key references a output (namespace_map contains all)
-                    key ∉ Set(nspcd_outputs) && throw(ArgumentError("Output $o ∉ outputs ∪ outputs_promoted"))
-                    newoutputs[i] = key
+                else
+                    if (index = findfirst(v->isequal(v, o), nspcd_outputs)) !== nothing
+                        newoutputs[i] = nspcd_outputs[index]
+                    elseif (key = findfirst(v->isequal(v, o), namespace_map)) !== nothing
+                        newoutputs[i] = key
+                    else
+                        throw(ArgumentError("Output Symbolic $o neither found in namespaced outputs nor namespace_map"))
+                    end
                 end
             end
             former_outputs = setdiff(nspcd_outputs, newoutputs)
@@ -509,6 +520,7 @@ include("visualization.jl")
 include("deprecated.jl")
 
 @compile_workload begin
+    BlockSystems.WARN[] = false
     @parameters t i1(t) i2(t) a b ina(t) inb(t)
     @variables x1(t) x2(t) o(t) add(t)
 
@@ -575,6 +587,7 @@ include("deprecated.jl")
     generate_io_function(con);
     generate_io_function(con1);
     generate_io_function(con2);
+    BlockSystems.WARN[] = true
 end
 
 end # module

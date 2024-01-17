@@ -1,4 +1,4 @@
-export @connect
+export @connect, find_ss
 
 """
     @check cond msg
@@ -103,8 +103,7 @@ remove_namespace(B, A₊B₊x) -> A₊B₊x
 ````
 """
 remove_namespace(namespace, name::T) where T = T(replace(String(name), Regex("^$(namespace)₊") => ""))
-remove_namespace(namespace, x::Sym) = rename(x, remove_namespace(namespace, x.name))
-remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, operation(x).name))
+remove_namespace(namespace, x::Union{Symbolic,Num}) = rename(x, remove_namespace(namespace, Symbolics.getname(x)))
 
 """
     remove_namespace(x)
@@ -112,8 +111,7 @@ remove_namespace(namespace, x::Term) = rename(x, remove_namespace(namespace, ope
 Strips `x` of its first namespace. `A₊B₊x -> B₊x`
 """
 remove_namespace(name::T) where T = T(replace(String(name), Regex("^(.+?)₊") => ""))
-remove_namespace(x::Sym) = rename(x, remove_namespace(x.name))
-remove_namespace(x::Term) = rename(x, remove_namespace(operation(x).name))
+remove_namespace(x::Union{Symbolic,Num}) = rename(x, remove_namespace(Symbolics.getname(x)))
 
 eqsubstitute(eq::Equation, rules) = substitute(eq.lhs, rules) ~ substitute(eq.rhs, rules)
 substitute_rhs(eq::Equation, rules) = eq.lhs ~ substitute(eq.rhs, rules)
@@ -150,11 +148,11 @@ Checks the type of the equation. Returns:
 
 """
 function eq_type(eq::Equation)
-    if eq.lhs isa Term && operation(eq.lhs) isa Differential
+    if istree(eq.lhs) && operation(eq.lhs) isa Differential
         vars = get_variables(eq.lhs)
         @check length(vars) == 1 "Diff. eq $eq has more than one variable in lhs!"
         return (:explicit_diffeq, vars[1])
-    elseif eq.lhs isa Sym || eq.lhs isa Term
+    elseif eq.lhs isa SymbolicUtils.Symbolic
         vars = get_variables(eq.lhs)
         @check length(vars) == 1 "Algebraic eq $eq has more than one variable in lhs!"
         diffs = _collect_differentials(eq.rhs)
@@ -321,4 +319,39 @@ function _collect_connections!(systems, cons, p1, p2)
     else
         throw(ArgumentError("Cannot make sens of pair $p1 => $p2"))
     end
+end
+
+function find_ss(blk, inputs::Dict{Symbol, <:Number}, outputs::Dict{Symbol, <:Number})
+    inval  = map(k->inputs[k],  getname.(blk.inputs))
+    outval = map(k->outputs[k], getname.(blk.outputs))
+    find_ss(blk, inval, outval)
+end
+
+function find_ss(blk, inputs::Vector{<:Number}, outputs::Vector{<:Number})
+    @check isempty(blk.iparams) "Currently, all params need to be closed for that."
+
+    irepl = blk.inputs .=> inputs
+    osubs = blk.outputs .=> outputs
+    eqs = equations(replace_vars(blk, irepl))
+
+    ss_rhs = map(eqs) do eq
+        type, _ = eq_type(eq)
+        if type == :explicit_algebraic
+            eq = 0 ~ eq.rhs - eq.lhs
+        elseif type == :explicit_diffeq
+            eq = 0 ~ eq.rhs
+        else
+            error("Equation type $type not implemented for find_ss.")
+        end
+        rhs = substitute(eq.rhs, osubs)
+    end
+    f_oop, f_ip = build_function(ss_rhs, blk.istates; expression=Val{false})
+
+    u0 = randn(MersenneTwister(1), length(blk.istates))
+    prob = NonlinearProblem{false}(f_oop, u0)
+    sol = solve(prob, SimpleNewtonRaphson())
+    if !SciMLBase.successful_retcode(sol.retcode)
+        error("Initial state for block $blk could not be derived from input/output steadystate.")
+    end
+    getname.(blk.istates) .=> sol.u
 end

@@ -17,6 +17,7 @@ optional:
 - `f_rem_states`: define removed states algebraic state order
 - `expression=Val{false}`: toggle expression and callable function output
 - `warn=WARN[]`: toggle warnings for missing `f_*` parameters
+- `observed=false`: toggle creation ob "observed" function
 
 Returns an named tuple with the fields
 - for `type=:ode`:
@@ -33,10 +34,11 @@ Returns an named tuple with the fields
 - `rem_states` symbols of removed states (in order)
 - `g_ip`, `g_oop` functions `g((opt. out), states, inputs, params, iv)` to calculate the
   removed states (substituted expl. algebraic equations). `nothing` if empty.
+- `obsf`: Only if `observed=true`. Function in the SciML "observed" style `(sym, u, p, t)`
 """
 function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [],
                               f_params = [], f_rem_states = [],
-                              expression = Val{false}, verbose=false, type=:auto, warn=WARN[])
+                              expression = Val{false}, verbose=false, type=:auto, observed=false, warn=WARN[])
     if ios isa IOSystem
         @info "Transform given system $(ios.name) to block"
         ios = connect_system(ios, verbose=verbose)
@@ -112,10 +114,10 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     end
 
     # substitute x(t) by x for all terms
-    state_syms = strip_iv(states, get_iv(ios))
-    input_syms = strip_iv(inputs, get_iv(ios))
-    param_syms = strip_iv(params, get_iv(ios))
-    rem_state_syms = strip_iv(rem_states, get_iv(ios))
+    state_syms = strip_iv.(states, get_iv(ios))
+    input_syms = strip_iv.(inputs, get_iv(ios))
+    param_syms = strip_iv.(params, get_iv(ios))
+    rem_state_syms = strip_iv.(rem_states, get_iv(ios))
 
     sub = merge(Dict(states .=> state_syms),
                 Dict(inputs .=> input_syms),
@@ -132,12 +134,25 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
     # generate functions for removed states
     if isempty(rem_states)
         g_oop = nothing; g_ip = nothing
+        obsf = nothing
     else
         rem_eqs = reorder_by_states(ios.removed_eqs, rem_states)
         verbose && @info "Reordered removed eqs" rem_eqs rem_states
 
         rem_formulas = [substitute(eq.rhs, sub) for eq in rem_eqs]
         g_oop, g_ip = build_function(rem_formulas, state_syms, input_syms, param_syms, get_iv(ios); expression = expression)
+
+        if observed
+            @check isempty(input_syms) "Cannot create `observed` function if there are open inputs."
+            obsdict = Dict{Symbol, Function}()
+            for (idx, state) in pairs(rem_states)
+                obs_oop, _  = build_function(rem_formulas[[idx]], state_syms, input_syms, param_syms, get_iv(ios); expression)
+                obsdict[getname(state)] = obs_oop
+                obsf = (sym, u, p, t) -> only(obsdict[sym](u, nothing, p, t))
+            end
+        else
+            obsf = nothing
+        end
     end
 
     return (f_oop=f_oop, f_ip=f_ip,
@@ -146,7 +161,8 @@ function generate_io_function(ios::AbstractIOSystem; f_states = [], f_inputs = [
             inputs=input_syms,
             params=param_syms,
             g_oop=g_oop, g_ip=g_ip,
-            rem_states=rem_state_syms)
+            rem_states=rem_state_syms,
+            obsf)
 end
 
 """
@@ -156,13 +172,14 @@ Return an `ODEFunction` object with the corresponding mass matrix and variable n
 """
 function SciMLBase.ODEFunction(iob::IOBlock; f_states=Symbol[], f_params=Symbol[], verbose=false, warn=WARN[])
     @check isempty(iob.inputs) "all inputs must be closed"
-    gen = generate_io_function(iob; f_states, f_params, verbose, warn);
-    observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
+    gen = generate_io_function(iob; f_states, f_params, verbose, warn, observed=true);
+
+    # observed = (sym,u,p,t)->gen.g_oop(u,nothing,p,t)[findfirst(isequal(sym), Symbol.(gen.rem_states))]
     ODEFunction((du,u,p,t) -> gen.f_ip(du,u,nothing,p,t);
                 mass_matrix = gen.massm,
                 syms=Symbol.(gen.states),
                 indepsym=get_iv(iob),
-                observed)
+                observed=gen.obsf)
 end
 
 """
@@ -171,7 +188,7 @@ end
 Strip functional dependency of the independent variable `x(iv) -> x`.
 """
 function strip_iv(x::Symbolic, iv::Symbolic)
-    if istree(x) && operation(x) isa Sym
+    if istree(x) && operation(x) isa Symbolic
         if (length(arguments(x)) != 1 || !isequal(arguments(x)[1], iv))
             error("Don't knowhow to handle expression $x")
         end
@@ -181,7 +198,6 @@ function strip_iv(x::Symbolic, iv::Symbolic)
     end
 end
 strip_iv(x::Num, iv::Num) = Num(strip_iv(value(x), value(iv)))
-strip_iv(xv::Vector, iv) = map(x->strip_iv(x, iv), xv)
 
 """
     prepare_f_vector(iob, vector)
@@ -204,7 +220,7 @@ end
 function transform_algebraic_equations(eqs::AbstractVector{Equation})
     eqs = deepcopy(eqs)
     for (i, eq) in enumerate(eqs)
-        if eq.lhs isa Term && operation(eq.lhs) isa Differential
+        if istree(eq.lhs) && operation(eq.lhs) isa Differential
             continue
         end
         eqs[i] = 0 ~ eq.rhs - eq.lhs
@@ -213,7 +229,7 @@ function transform_algebraic_equations(eqs::AbstractVector{Equation})
 end
 
 function reorder_by_states(eqs::AbstractVector{Equation}, states)
-    @assert length(eqs) == length(states) "Numbers of eqs should be equal to states!"
+    @assert length(eqs) == length(states) "Numbers of eqs should be equal to states! ($(length(eqs)) equations for $(length(states)) states = $states)"
     # for each state, collect the eq_idx which corresponds some states (implicit
     # algebraic) don't have special equations attached to them those are the "undused_idx"
     eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->isequal(s, lhs_var(x)), eqs) for s in states]
@@ -230,7 +246,7 @@ end
 function generate_massmatrix(eqs::AbstractVector{Equation})
     V = Vector{Int}(undef, length(eqs))
     for i in 1:length(eqs)
-        if eqs[i].lhs isa Term && operation(eqs[i].lhs) isa Differential
+        if istree(eqs[i].lhs) && operation(eqs[i].lhs) isa Differential
             V[i] = 1
         elseif isequal(eqs[i].lhs, 0)
             V[i] = 0
