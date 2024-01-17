@@ -47,7 +47,7 @@ makedocs(;
                        "Kuramoto Network" => "generated/kuramoto_network.md",
                        "Kuramoto without ND.jl" => "generated/kuramoto_without_nd.md"]
     ],
-)
+    warnonly=[:missing_docs])
 
 deploydocs(;
     repo="github.com/hexaeder/BlockSystems.jl",
