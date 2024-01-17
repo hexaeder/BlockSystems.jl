@@ -25,6 +25,7 @@ function connect_system(ios::IOSystem;
                         remove_superflous_states=false,
                         substitute_algebraic_states=true,
                         substitute_derivatives=true,
+                        name=ios.name,
                         warn=WARN[])
     # recursive connect all subsystems
     for (i, subsys) in enumerate(ios.systems)
@@ -67,7 +68,7 @@ function connect_system(ios::IOSystem;
     eqs = map(eq->eqsubstitute(eq, promotion_rules), eqs)
     removed_eqs  = map(eq->eqsubstitute(eq, promotion_rules), removed_eqs)
 
-    block = IOBlock(ios.name, eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios), warn)
+    block = IOBlock(name, eqs, ios.inputs, ios.outputs, removed_eqs; iv=get_iv(ios), warn)
 
     if remove_superflous_states
         block = BlockSystems.remove_superflous_states(block; verbose, warn)
@@ -333,7 +334,10 @@ function replace_vars(blk::IOBlock, dict::Dict; warn=WARN[])
                 @check sym ∈ validp "Symbol $sym is neither iparam nor input of block. Can not repalace with number."
             end
             subs[sym] = dict[k]
-        elseif v isa Symbol || v isa Symbolic
+        elseif (v isa Symbol || v isa Symbolic)
+            if (istree(v))
+                error("Cannot handle symbolic trees in replace_vars, try to wrap in num?")
+            end
             # rename path
             val = rename(sym, v)
             subs[sym] = val
@@ -367,8 +371,8 @@ function set_input(blk::IOBlock, p::Pair; verbose=false)
     tmpblk = IOBlock([tmp ~ val], [], [tmp])
     sys = IOSystem([getproperty(tmpblk, inputname) => getproperty(blk, inputname)],
                     [tmpblk, blk];
-                   outputs=namespace_outputs(blk), name=blk.name)
-    return connect_system(sys; verbose)
+                   outputs=namespace_outputs(blk))
+    return connect_system(sys; verbose, name=blk.name)
 end
 
 """
@@ -412,14 +416,37 @@ function make_iparam(blk::IOBlock, sym; warn=WARN[])
     IOBlock(blk.name, eqs, filter(!isequal(var), blk.inputs), blk.outputs, rem_eqs; iv, warn)
 end
 
-export make_istate
+export make_istate, make_output
+
 """
+    make_istate(blk::IOBlock, sym; warn=WARN[])
+
+Move one or multiple outputs `sym` to internal states.
 """
 function make_istate(blk::IOBlock, sym; warn=WARN[])
     blk = deepcopy(blk)
-    var_nspcd = getproperty(blk, sym)
-    var = remove_namespace(blk.name, var_nspcd)
-    @check var ∈ Set(blk.outputs) "$sym is not an output of block."
+    var_nspcd = getproperty.(Ref(blk), sym)
+    var = remove_namespace.(blk.name, var_nspcd)
+
+    wrapvar = length(var) == 1 ? (var,) : var
+    @check wrapvar ⊆ Set(blk.outputs) "$sym is not subset of outputs of block."
 
     IOBlock(blk.name, equations(blk), blk.inputs, filter(!isequal(var), blk.outputs), blk.removed_eqs; iv=get_iv(blk), warn)
+end
+
+
+"""
+    make_output(blk::IOBlock, sym; warn=WARN[])
+
+Move one or internal stats `sym` to outputs.
+"""
+function make_output(blk::IOBlock, sym; warn=WARN[])
+    blk = deepcopy(blk)
+    var_nspcd = getproperty.(Ref(blk), sym)
+    var = remove_namespace.(blk.name, var_nspcd)
+
+    wrapvar = length(var) == 1 ? (var,) : var
+    @check wrapvar ⊆ Set(blk.istates) "$sym is not subset of outputs of block."
+
+    IOBlock(blk.name, equations(blk), blk.inputs, vcat(var, blk.outputs), blk.removed_eqs; iv=get_iv(blk), warn)
 end

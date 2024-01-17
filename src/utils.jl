@@ -1,4 +1,4 @@
-export @connect
+export @connect, find_ss
 
 """
     @check cond msg
@@ -319,4 +319,39 @@ function _collect_connections!(systems, cons, p1, p2)
     else
         throw(ArgumentError("Cannot make sens of pair $p1 => $p2"))
     end
+end
+
+function find_ss(blk, inputs::Dict{Symbol, <:Number}, outputs::Dict{Symbol, <:Number})
+    inval  = map(k->inputs[k],  getname.(blk.inputs))
+    outval = map(k->outputs[k], getname.(blk.outputs))
+    find_ss(blk, inval, outval)
+end
+
+function find_ss(blk, inputs::Vector{<:Number}, outputs::Vector{<:Number})
+    @check isempty(blk.iparams) "Currently, all params need to be closed for that."
+
+    irepl = blk.inputs .=> inputs
+    osubs = blk.outputs .=> outputs
+    eqs = equations(replace_vars(blk, irepl))
+
+    ss_rhs = map(eqs) do eq
+        type, _ = eq_type(eq)
+        if type == :explicit_algebraic
+            eq = 0 ~ eq.rhs - eq.lhs
+        elseif type == :explicit_diffeq
+            eq = 0 ~ eq.rhs
+        else
+            error("Equation type $type not implemented for find_ss.")
+        end
+        rhs = substitute(eq.rhs, osubs)
+    end
+    f_oop, f_ip = build_function(ss_rhs, blk.istates; expression=Val{false})
+
+    u0 = randn(MersenneTwister(1), length(blk.istates))
+    prob = NonlinearProblem{false}(f_oop, u0)
+    sol = solve(prob, SimpleNewtonRaphson())
+    if !SciMLBase.successful_retcode(sol.retcode)
+        error("Initial state for block $blk could not be derived from input/output steadystate.")
+    end
+    getname.(blk.istates) .=> sol.u
 end

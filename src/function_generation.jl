@@ -229,7 +229,7 @@ function transform_algebraic_equations(eqs::AbstractVector{Equation})
 end
 
 function reorder_by_states(eqs::AbstractVector{Equation}, states)
-    @assert length(eqs) == length(states) "Numbers of eqs should be equal to states!"
+    @assert length(eqs) == length(states) "Numbers of eqs should be equal to states! ($(length(eqs)) equations for $(length(states)) states = $states)"
     # for each state, collect the eq_idx which corresponds some states (implicit
     # algebraic) don't have special equations attached to them those are the "undused_idx"
     eq_idx::Vector{Union{Int, Nothing}} = [findfirst(x->isequal(s, lhs_var(x)), eqs) for s in states]
