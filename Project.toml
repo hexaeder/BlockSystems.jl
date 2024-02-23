@@ -19,7 +19,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 [compat]
 DocStringExtensions = "0.7, 0.8, 0.9"
 Graphs = "1.4"
-ModelingToolkit = "8"
+ModelingToolkit = "8, 9"
 PrecompileTools = "1"
 Reexport = "1"
 SciMLBase = "1,2"
